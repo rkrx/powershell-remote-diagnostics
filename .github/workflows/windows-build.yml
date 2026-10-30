@@ -40,7 +40,19 @@ jobs:
         run: dotnet restore --locked-mode
 
       - name: Run Release tests on Windows
-        run: dotnet test -c Release -m:1 --no-restore --blame-hang-timeout 2m
+        run: dotnet test -c Release -m:1 --no-restore --blame-hang-timeout 2m --logger "trx;LogFileName=windows-tests.trx" --results-directory TestResults
+
+      - name: Report failing Windows tests
+        if: failure()
+        run: |
+          Get-ChildItem TestResults -Filter *.trx -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+            [xml]$results = Get-Content $_.FullName -Raw
+            foreach ($test in $results.SelectNodes("//*[local-name()='UnitTestResult' and @outcome='Failed']")) {
+              $details = "$($test.testName): $($test.Output.ErrorInfo.Message) $($test.Output.ErrorInfo.StackTrace)"
+              $escaped = $details.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+              Write-Host "::error::$escaped"
+            }
+          }
 
       - name: Build self-contained Windows package
         run: ./scripts/Publish-Windows.ps1
