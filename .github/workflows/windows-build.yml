@@ -6,14 +6,21 @@ on:
     tags: ['v*']
   pull_request:
     branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing release tag to build and attach a Windows download (leave empty for a build only)'
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: windows-build-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  group: windows-build-${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'release' && !inputs.release_tag && !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   build:
@@ -27,6 +34,7 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
           persist-credentials: false
 
       - name: Set up .NET 10
@@ -83,7 +91,10 @@ jobs:
 
   release:
     name: Publish versioned release download
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      github.event_name == 'release' ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -101,7 +112,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag || github.ref_name }}
         run: |
           package="release/Windows-Powershell-RC-win-x64.zip"
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then

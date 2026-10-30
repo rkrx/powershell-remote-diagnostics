@@ -26,6 +26,8 @@ Build the portable Windows distribution with scripts/Publish-Windows.ps1. The re
 
 ## GitHub Actions
 
-The Windows download workflow runs the Release suite on `windows-2022` before using the existing packaging script. Successful runs expose the complete self-contained ZIP as an Actions artifact, retained for 30 days. A manual run is available from the Actions tab. Version tags matching `v*` additionally publish the tested package as a GitHub Release asset; ordinary builds have read-only repository permissions.
+The Windows download workflow runs the Release suite on `windows-2022` before using the existing packaging script. Successful runs expose the complete self-contained ZIP as an Actions artifact, retained for 30 days. Publishing a GitHub Release (including a prerelease) builds its tagged revision and attaches the tested ZIP as a release asset, regardless of whether the tag has a `v` prefix. Draft releases do not trigger a build. Version tag pushes matching `v*` also create a release with the package.
+
+A manual run is available from the Actions tab. The optional `release_tag` input checks out exactly `refs/tags/<release_tag>` and publishes the package for that release; an empty input produces only the ordinary build artifact. Select `main` for the workflow definition when backfilling an older release. Release/tag builds use tag-specific concurrency groups and are not cancelled by newer branch builds. Ordinary builds have read-only repository permissions.
 
 The release job has content write permission and uses the built-in GitHub token. No deployment host, private path, custom secret, or external infrastructure is configured. Windows runner validation does not replace acceptance on every OS edition listed in the platform targets.
