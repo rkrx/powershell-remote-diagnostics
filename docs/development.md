@@ -20,6 +20,6 @@ Use the Windows acceptance checklist for the actual target OS versions. Record t
 
 ## Build artifacts
 
-Build outputs, test results and local settings are ignored by Git. Source paths in project-owned debug symbols are mapped to a generic /_/ prefix so distributed binaries do not embed a developer's checkout path. Do not add generated files or machine-specific configuration to the repository.
+Build outputs, test results and local settings are ignored by Git. Source paths in project-owned debug symbols are mapped to a generic /_/ prefix. Continuous-integration path normalization also applies to SourceLink metadata; the packaging script rejects project binaries or symbols containing the checkout path. Do not add generated files or machine-specific configuration to the repository.
 
 Build the portable Windows distribution with scripts/Publish-Windows.ps1. The resulting artifacts directory is for local distribution output and is not committed.

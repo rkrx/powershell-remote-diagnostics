@@ -9,6 +9,18 @@ if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed.' }
 foreach ($required in @('WindowsPowerShellRc.exe', 'coreclr.dll', 'System.Management.Automation.dll', 'Microsoft.PowerShell.Commands.Utility.dll')) {
     if (-not (Test-Path (Join-Path $output $required))) { throw "Missing packaged dependency: $required" }
 }
+# Project-owned binaries and symbols must not disclose the build checkout path.
+foreach ($name in @('WindowsPowerShellRc.dll', 'WindowsPowerShellRc.pdb')) {
+    $path = Join-Path $output $name
+    if (-not (Test-Path $path)) { continue }
+    $bytes = [System.IO.File]::ReadAllBytes($path)
+    foreach ($encoding in @([System.Text.Encoding]::UTF8, [System.Text.Encoding]::Unicode)) {
+        $text = $encoding.GetString($bytes)
+        if ($text.Contains($repo) -or $text.Contains($repo.Replace('\', '/'))) {
+            throw "Local checkout path detected in $name; distribution aborted."
+        }
+    }
+}
 Copy-Item (Join-Path $repo 'README.md') $output -Force
 Copy-Item (Join-Path $repo 'LICENSE') $output -Force
 $docs = Join-Path $output 'docs'
