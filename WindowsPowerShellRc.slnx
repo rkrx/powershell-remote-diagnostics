@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WindowsPowerShellRc/WindowsPowerShellRc.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WindowsPowerShellRc.Tests/WindowsPowerShellRc.Tests.csproj" />
+  </Folder>
+</Solution>

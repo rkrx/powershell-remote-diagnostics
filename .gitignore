@@ -1,0 +1,17 @@
+**/bin/
+**/obj/
+artifacts/
+.superpowers/
+*.user
+.vs/
+.idea/
+.vscode/
+.DS_Store
+TestResults/
+*.trx
+*.log
+*.binlog
+.env
+.env.*
+!.env.example
+WORKLOG.md

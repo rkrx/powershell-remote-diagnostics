@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <PathMap>$(MSBuildThisFileDirectory)=/_/</PathMap>
+  </PropertyGroup>
+</Project>
