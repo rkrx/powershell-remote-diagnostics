@@ -34,7 +34,7 @@ public class StorageFaultTests
     public void PartialUncommittedRecordCannotCorruptPriorOutput()
     {
         using var store = new OutputStore();
-        var output = store.Create(Guid.NewGuid());
+        using var output = store.Create(Guid.NewGuid());
         output.Append("output", "committed");
         var data = (FileStream)typeof(StoredOutput).GetField("data", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(output)!;
         data.Position = data.Length;

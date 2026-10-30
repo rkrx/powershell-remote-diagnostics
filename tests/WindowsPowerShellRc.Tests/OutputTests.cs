@@ -9,7 +9,7 @@ public class OutputTests
     public void LongUnicodeLineCanBeReconstructedExactly()
     {
         using var store = new OutputStore();
-        var output = store.Create(Guid.NewGuid());
+        using var output = store.Create(Guid.NewGuid());
         var text = string.Concat(Enumerable.Repeat("😀", 5000)) + "needle";
         output.Append("output", text);
         var first = output.ReadPage();
@@ -27,7 +27,7 @@ public class OutputTests
     public void SearchPagesBindCursorAndPreserveLineContext()
     {
         using var store = new OutputStore();
-        var output = store.Create(Guid.NewGuid());
+        using var output = store.Create(Guid.NewGuid());
         output.Append("output", "before\ncat cat\n\nafter cat");
         var options = new SearchOptions("cat", Limit: 1, BeforeLines: 1, AfterLines: 1);
         var first = output.Search(options);
@@ -44,7 +44,7 @@ public class OutputTests
     public void PageHasBoundedTextAndContinuation()
     {
         using var store = new OutputStore();
-        var output = store.Create(Guid.NewGuid());
+        using var output = store.Create(Guid.NewGuid());
         for (int i = 0; i < 200; i++) output.Append("output", new string('x', 4096));
         var page = output.ReadPage(lineCount: 200);
         Assert.True(page.Lines.Sum(l => Encoding.UTF8.GetByteCount(l.Text)) <= 256 * 1024);
@@ -55,7 +55,7 @@ public class OutputTests
     public void SearchBudgetRetainsEveryRequestedContextLineWithRetrievalCoordinates()
     {
         using var store = new OutputStore();
-        var output = store.Create(Guid.NewGuid());
+        using var output = store.Create(Guid.NewGuid());
         for (int i = 0; i < 41; i++) output.Append("output", string.Concat(Enumerable.Repeat("😀", 4096)) + (i == 20 ? "needle" : ""));
         var result = output.Search(new("needle", BeforeLines: 20, AfterLines: 20));
         var match = Assert.Single(result.Matches);
