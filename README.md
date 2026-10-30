@@ -10,6 +10,8 @@ Extract the complete package. Do not copy only the executable. Existing Windows 
 
 ## Start the server
 
+Download the Windows ZIP from a [GitHub Release](https://github.com/rkrx/powershell-remote-diagnostics/releases) or from the [Build Windows download](https://github.com/rkrx/powershell-remote-diagnostics/actions/workflows/windows-build.yml) run on the repository's Actions tab. Extract the complete ZIP; `WindowsPowerShellRc.exe` needs the accompanying runtime and PowerShell files.
+
 Open an interactive terminal in the extracted directory:
 
 ```powershell
@@ -122,6 +124,21 @@ pwsh -File scripts/Publish-Windows.ps1
 ```
 
 The project uses .NET 10 and the official Microsoft.PowerShell.SDK 7.6.8. The packaging script produces a self-contained `win-x64` directory and ZIP under `artifacts/`, without trimming, NativeAOT, or an installer. All project-authored documentation, prompts, and declarations are in English. Custom declarations and diagnostic output retain their supplied language.
+
+### GitHub builds and downloads
+
+The workflow in [`.github/workflows/windows-build.yml`](.github/workflows/windows-build.yml) builds on a GitHub-hosted Windows runner. It runs on pushes to `main`, pull requests targeting `main`, version tags matching `v*`, and manual **Run workflow** requests.
+
+It restores locked dependencies, runs the Release tests, builds the self-contained package, checks the executable, and uploads `Windows-Powershell-RC-win-x64.zip`. Open **Actions → Build Windows download → a successful run → Artifacts**, or use the download link in the run summary. Actions downloads are retained for 30 days and may require signing in to GitHub.
+
+Pushing a version tag also publishes the tested ZIP as a GitHub Release asset:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Use a new tag for each version. Re-running the release job replaces the ZIP asset for that same tag. Release downloads remain available beyond the Actions artifact retention period. No personal token or custom repository secret is required; the release job uses GitHub's built-in token with repository content write permission. No release is created for ordinary branch or pull request builds.
 
 See [development guidance](docs/development.md), [platform targets](docs/platform-support.md), and the [Windows acceptance checklist](docs/windows-acceptance.md).
 

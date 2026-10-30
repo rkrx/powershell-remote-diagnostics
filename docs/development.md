@@ -23,3 +23,9 @@ Use the Windows acceptance checklist for the actual target OS versions. Record t
 Build outputs, test results and local settings are ignored by Git. Source paths in project-owned debug symbols are mapped to a generic /_/ prefix. Continuous-integration path normalization also applies to SourceLink metadata; the packaging script rejects project binaries or symbols containing the checkout path. Do not add generated files or machine-specific configuration to the repository.
 
 Build the portable Windows distribution with scripts/Publish-Windows.ps1. The resulting artifacts directory is for local distribution output and is not committed.
+
+## GitHub Actions
+
+The Windows download workflow runs the Release suite on `windows-2022` before using the existing packaging script. Successful runs expose the complete self-contained ZIP as an Actions artifact, retained for 30 days. A manual run is available from the Actions tab. Version tags matching `v*` additionally publish the tested package as a GitHub Release asset; ordinary builds have read-only repository permissions.
+
+The release job has content write permission and uses the built-in GitHub token. No deployment host, private path, custom secret, or external infrastructure is configured. Windows runner validation does not replace acceptance on every OS edition listed in the platform targets.
