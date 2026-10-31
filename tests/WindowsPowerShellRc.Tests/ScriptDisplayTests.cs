@@ -61,4 +61,24 @@ public class ScriptDisplayTests
         Assert.Equal("Write-Output before <# explain #> after",
             ScriptDisplay.Format("Write-Output before <# explain #> after", "Inspect arguments", 80));
     }
+
+    [Fact]
+    public void MultilineArraysAndExistingPipelineBreaksKeepNestedIndentation()
+    {
+        string display = ScriptDisplay.Format("$items = @(\nGet-Item . |\nSelect-Object Name\n)", "Inspect item names", 80);
+        Assert.Contains("@(\n    Get-Item . |\n        Select-Object Name\n)", display);
+    }
+
+    [Fact]
+    public void SubexpressionsDoNotLoseTheEnclosingBlockIndentation()
+    {
+        string display = ScriptDisplay.Format("foreach ($i in 1..2) { $x = $(Get-Item .); Write-Output $x }", "Inspect items", 80);
+        Assert.Contains(";\n    Write-Output $x\n}", display);
+    }
+
+    [Fact]
+    public void MultipleStatementsGetAnExplanationRegardlessOfTheirSeparator()
+    {
+        Assert.StartsWith("# Inspect value\n", ScriptDisplay.Format("$value = 1\n$value", "Inspect value", 80));
+    }
 }

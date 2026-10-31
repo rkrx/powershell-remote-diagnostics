@@ -8,9 +8,10 @@ public static class ScriptDisplay
     public static string Format(string script, string reason, int width)
     {
         script = script.Replace("\r\n", "\n");
-        Parser.ParseInput(script, out var tokens, out var errors);
+        var ast = Parser.ParseInput(script, out var tokens, out var errors);
         var formatted = new StringBuilder();
-        bool complex = tokens.Any(t => t.Kind is TokenKind.Semi or TokenKind.Pipe or TokenKind.LCurly or TokenKind.AtCurly);
+        bool complex = ast.EndBlock?.Statements.Count > 1 ||
+            tokens.Any(t => t.Kind is TokenKind.Semi or TokenKind.Pipe or TokenKind.LCurly or TokenKind.AtCurly);
         if (complex && !script.TrimStart().StartsWith('#') && !script.TrimStart().StartsWith("<#", StringComparison.Ordinal))
             foreach (string line in reason.Replace("\r\n", "\n").Split('\n')) formatted.Append("# ").Append(line).Append('\n');
 
@@ -31,10 +32,16 @@ public static class ScriptDisplay
             foreach (var token in tokens)
             {
                 if (token.Kind == TokenKind.EndOfInput) break;
-                if (token.Kind == TokenKind.NewLine) { Flush(); previousEnd = token.Extent.EndOffset; continue; }
+                if (token.Kind == TokenKind.NewLine)
+                {
+                    if (line.Length > 0) Flush();
+                    previousEnd = token.Extent.EndOffset;
+                    continue;
+                }
                 string gap = script[previousEnd..token.Extent.StartOffset];
-                if (gap.Contains('\n')) Flush();
+                if (gap.Contains('\n') && line.Length > 0) Flush();
                 if (token.Kind == TokenKind.RCurly) { Flush(); depth = Math.Max(0, depth - 1); }
+                if (token.Kind is TokenKind.RParen or TokenKind.RBracket) depth = Math.Max(0, depth - 1);
                 if (line.Length == 0) line.Append(' ', 4 * (depth + (continuation ? 1 : 0)));
                 else if (gap.Length > 0) line.Append(' ');
                 line.Append(token.Text);
@@ -43,6 +50,10 @@ public static class ScriptDisplay
                 {
                     case TokenKind.LCurly:
                     case TokenKind.AtCurly: Flush(); depth++; break;
+                    case TokenKind.LParen:
+                    case TokenKind.AtParen:
+                    case TokenKind.DollarParen:
+                    case TokenKind.LBracket: depth++; break;
                     case TokenKind.Semi: Flush(); break;
                     case TokenKind.Comment:
                         if (token.Text.StartsWith('#')) Flush();
