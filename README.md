@@ -10,8 +10,8 @@ Download the appropriate archives from [GitHub Releases](https://github.com/rkrx
 |---|---|---|
 | Server | `WindowsPowerShellRc-Server-win-x64.zip` | Windows x64 |
 | Client | `WindowsPowerShellRc-Client-win-x64.zip` | Windows x64 |
-| Client | `WindowsPowerShellRc-Client-osx-arm64.tar.gz` | Apple Silicon macOS |
-| Client | `WindowsPowerShellRc-Client-osx-x64.tar.gz` | Intel macOS |
+
+New CI builds and releases provide Windows packages only. Older releases may still contain macOS archives; macOS source development remains available.
 
 Extract the entire package. Keep all DLLs, runtime files and, on the server, the `Modules` directory beside the executable. Neither component requires a separate .NET installation.
 
@@ -122,6 +122,6 @@ Use .NET 10, locked dependency restores and the [development instructions](docs/
 ./scripts/Publish-Package.ps1 -Component Client -Runtime osx-arm64
 ```
 
-GitHub Actions builds and tests Windows packages and builds the macOS client. Publishing a release or pushing a `v*` tag attaches separate server/client downloads. A manual workflow run accepts `release_tag` to rebuild an existing version; an empty value creates build artifacts only. No personal token or custom deployment secret is required.
+GitHub Actions builds and tests the Windows server and client packages only. Publishing a release or pushing a `v*` tag attaches separate server/client downloads. A manual workflow run accepts `release_tag` to rebuild an existing version; an empty value creates build artifacts only. No personal token or custom deployment secret is required.
 
 All project-authored documentation, prompts and declarations are English. Supplied declarations, commands and output retain their own language. Do not commit real connection strings, diagnostic data, hostnames or local environment details.
