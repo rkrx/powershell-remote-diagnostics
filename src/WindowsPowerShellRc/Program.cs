@@ -4,7 +4,7 @@ try
 {
     var options = CliOptions.Parse(args);
     if (options.Help) { Console.WriteLine(CliOptions.Usage); return 0; }
-    if (options.Version) { Console.WriteLine("Windows-Powershell-RC Server 0.2.0"); return 0; }
+    if (options.Version) { Console.WriteLine("Windows-Powershell-RC Server 0.2.1"); return 0; }
     if (!options.Auto && (Console.IsInputRedirected || Console.IsOutputRedirected))
         throw new ArgumentException("Manual mode requires an interactive console. Use --auto explicitly for unattended operation.");
     string declaration = options.ReadDeclaration();
@@ -16,7 +16,7 @@ try
     using var identity = new ServerIdentity();
     await using var app = GrpcApi.Build(options, declaration, identity, queue, engine.Version);
     await app.StartAsync();
-    Console.WriteLine($"Windows-Powershell-RC Server 0.2.0 — embedded PowerShell {engine.Version}");
+    Console.WriteLine($"Windows-Powershell-RC Server 0.2.1 — embedded PowerShell {engine.Version}");
 
     Console.WriteLine($"Environment: {(options.Test ? "TEST" : "PRODUCTION")}; approval: {(options.Auto ? "AUTO" : "MANUAL")}");
     Console.WriteLine($"Declaration:\n{ConsoleApproval.Escape(declaration)}");

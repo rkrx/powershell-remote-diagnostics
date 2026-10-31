@@ -9,7 +9,7 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
-        if (args.Length == 1 && args[0] == "--version") { Console.WriteLine("Windows-Powershell-RC Client 0.2.0"); return 0; }
+        if (args.Length == 1 && args[0] == "--version") { Console.WriteLine("Windows-Powershell-RC Client 0.2.1"); return 0; }
         if (args.Length == 1 && args[0] is "--help" or "-h")
         {
             Console.WriteLine("WindowsPowerShellRc.Client: MCP over stdio. Configure as an MCP server with no arguments. Use connect(connectionString) for direct connection, or connect() for the optional desktop dialog."); return 0;
@@ -23,7 +23,7 @@ internal static class Program
             builder.Logging.ClearProviders();
             builder.Services.AddSingleton<IConnectionPrompt, ConnectionDialog>();
             builder.Services.AddSingleton<ConnectionManager>();
-            builder.Services.AddMcpServer(o => o.ServerInfo = new() { Name = "powershell-remote-diagnostics", Version = "0.2.0" })
+            builder.Services.AddMcpServer(o => o.ServerInfo = new() { Name = "powershell-remote-diagnostics", Version = "0.2.1" })
                 .WithStdioServerTransport().WithTools<ClientTools>();
             using var host = builder.Build(); host.RunAsync().GetAwaiter().GetResult(); return 0;
         }
