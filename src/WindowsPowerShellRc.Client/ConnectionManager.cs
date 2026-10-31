@@ -7,6 +7,7 @@ using WindowsPowerShellRc.Protocol;
 using WindowsPowerShellRc.Transport;
 
 namespace WindowsPowerShellRc.Client;
+public sealed class ClientOperationException(string message) : Exception(message);
 public interface IConnectionPrompt { Task<string?> RequestAsync(CancellationToken cancellationToken); }
 public sealed class RemoteSession(ConnectionAddress address, GrpcChannel channel) : IDisposable
 {
@@ -24,7 +25,7 @@ public sealed class ConnectionManager(IConnectionPrompt prompt) : IDisposable
         await connecting.WaitAsync(token);
         try
         {
-            if (sessions.Count >= 16) throw new InvalidOperationException("Connection limit reached. Disconnect an unused connection first.");
+            if (sessions.Count >= 16) throw new ClientOperationException("Connection limit reached. Disconnect an unused connection first.");
             if (string.IsNullOrWhiteSpace(connectionString))
                 connectionString = await prompt.RequestAsync(token) ?? throw new OperationCanceledException("Connection entry was cancelled.");
             var address = ConnectionAddress.Parse(connectionString);
@@ -40,7 +41,7 @@ public sealed class ConnectionManager(IConnectionPrompt prompt) : IDisposable
             catch (RpcException ex)
             {
                 session.Dispose();
-                throw new InvalidOperationException($"Connection failed ({ex.StatusCode}). Check the address, server token and certificate fingerprint; no connection was retained.");
+                throw new ClientOperationException($"Connection failed ({ex.StatusCode}). Check the address, server token and certificate fingerprint; no connection was retained.");
             }
             catch { session.Dispose(); throw; }
         }
@@ -48,16 +49,16 @@ public sealed class ConnectionManager(IConnectionPrompt prompt) : IDisposable
     }
     public async Task<string> InvokeAsync<T>(string connectionId, Func<RemoteSession, Task<T>> operation) where T : IMessage
     {
-        if (!sessions.TryGetValue(connectionId, out var session)) throw new ArgumentException("Unknown connection ID. Connect first.");
+        if (!sessions.TryGetValue(connectionId, out var session)) throw new ClientOperationException("Unknown connection ID. Connect first.");
         try { return Formatter.Format(await operation(session)); }
         catch (RpcException ex)
         {
-            throw new InvalidOperationException($"Remote request failed ({ex.StatusCode}). An interrupted execution may still be running; do not blindly retry submission.");
+            throw new ClientOperationException($"Remote request failed ({ex.StatusCode}). An interrupted execution may still be running; do not blindly retry submission.");
         }
     }
     public string Disconnect(string connectionId)
     {
-        if (!sessions.TryRemove(connectionId, out var session)) throw new ArgumentException("Unknown connection ID.");
+        if (!sessions.TryRemove(connectionId, out var session)) throw new ClientOperationException("Unknown connection ID.");
         session.Dispose(); return "Disconnected. Accepted remote executions were not cancelled.";
     }
     public void Dispose() { foreach (var s in sessions.Values) s.Dispose(); sessions.Clear(); connecting.Dispose(); }

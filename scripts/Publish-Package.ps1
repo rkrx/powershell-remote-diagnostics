@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][ValidateSet('Server','Client')][string]$Component,
-    [Parameter(Mandatory)][ValidateSet('win-x64','osx-arm64')][string]$Runtime
+    [Parameter(Mandatory)][ValidateSet('win-x64','osx-arm64','osx-x64')][string]$Runtime
 )
 $ErrorActionPreference = 'Stop'
 if ($Component -eq 'Server' -and $Runtime -ne 'win-x64') { throw 'The server distribution targets Windows x64.' }

@@ -11,6 +11,7 @@ Download the appropriate archives from [GitHub Releases](https://github.com/rkrx
 | Server | `WindowsPowerShellRc-Server-win-x64.zip` | Windows x64 |
 | Client | `WindowsPowerShellRc-Client-win-x64.zip` | Windows x64 |
 | Client | `WindowsPowerShellRc-Client-osx-arm64.tar.gz` | Apple Silicon macOS |
+| Client | `WindowsPowerShellRc-Client-osx-x64.tar.gz` | Intel macOS |
 
 Extract the entire package. Keep all DLLs, runtime files and, on the server, the `Modules` directory beside the executable. Neither component requires a separate .NET installation.
 
@@ -108,7 +109,7 @@ Protobuf JSON represents 64-bit line coordinates as decimal strings. Optional fi
 
 Version 0.2 replaces REST entirely. `GET /` and `/executions` are no longer supported. The versioned protobuf contract is [diagnostics.proto](src/WindowsPowerShellRc.Transport/diagnostics.proto); gRPC methods are `GetInfo`, `Execute`, `GetExecution`, `ReadOutput`, `Search` and `Cancel`. All require authentication over pinned TLS. There is no plaintext fallback or certificate-verification bypass.
 
-Common gRPC errors: `Unauthenticated` for a bad token, `InvalidArgument` for bad input, `NotFound` for unknown/evicted IDs, `FailedPrecondition` for pending output/search, `ResourceExhausted` for full queues/oversized requests and `Internal` for storage failures. Client transport errors omit credentials; an interrupted execution may still be running.
+Common gRPC errors: `Unauthenticated` for a bad token, `InvalidArgument` for bad input, `NotFound` for unknown/evicted IDs, `FailedPrecondition` for pending output/search, `ResourceExhausted` for full queues/oversized requests and `Internal` for storage failures. MCP errors preserve sanitized status codes and recovery hints without exposing credentials; an interrupted execution may still be running.
 
 ## Build and validation
 

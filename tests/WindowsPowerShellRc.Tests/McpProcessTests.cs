@@ -48,6 +48,13 @@ public class McpProcessTests
             var bad = await Send(5, "tools/call", new { name = "connect", arguments = new { connectionString = "grpc://sensitive-input@host:8080" } });
             Assert.True(bad.GetProperty("result").GetProperty("isError").GetBoolean());
             Assert.DoesNotContain("sensitive-input", bad.ToString());
+            Assert.Contains("Invalid connection URL", bad.ToString());
+            var missing = await Send(6, "tools/call", new { name = "execution_status", arguments = new { connectionId, id = Guid.NewGuid().ToString() } });
+            Assert.True(missing.GetProperty("result").GetProperty("isError").GetBoolean());
+            Assert.Contains("NotFound", missing.ToString());
+            Assert.Contains("do not blindly retry", missing.ToString());
+            var unknown = await Send(7, "tools/call", new { name = "server_info", arguments = new { connectionId = Guid.NewGuid().ToString() } });
+            Assert.Contains("Unknown connection ID", unknown.ToString());
         }
         finally
         {

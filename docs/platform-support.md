@@ -21,10 +21,19 @@ Project compatibility is a separate claim from Microsoft's official runtime/OS s
 
 ## Agent discovery
 
-Authenticated `GET /` reports production/test mode, approval mode, embedded PowerShell version, OS description and version/build, computer name, executing user (including domain on Windows), OS architecture, process architecture and .NET runtime. OS description comes from the .NET runtime; the numeric OS version identifies the kernel/build and is not a substitute for checking a Windows product's edition or support lifecycle.
+Authenticated `GetInfo` (MCP `server_info`) reports production/test mode, approval mode, embedded PowerShell version, OS description and version/build, computer name, executing user (including domain on Windows), OS architecture, process architecture and .NET runtime. OS description comes from the .NET runtime; the numeric OS version identifies the kernel/build and is not a substitute for checking a Windows product's edition or support lifecycle.
 
 ## Sources
 
 - [Official .NET 10 supported OS matrix](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md)
 - [Microsoft: .NET installation and Windows support](https://learn.microsoft.com/en-us/dotnet/core/install/windows)
 - [Microsoft: PowerShell support lifecycle and supported platform criteria](https://learn.microsoft.com/en-us/powershell/scripting/install/powershell-support-lifecycle)
+
+
+## Client targets and TLS
+
+The server distribution remains Windows x64 only. The local MCP client is distributed separately for Windows x64 and macOS (Apple Silicon and Intel). Linux is deferred. Client packages include .NET, gRPC/MCP and the optional Avalonia UI, without the PowerShell engine.
+
+The server uses HTTP/2 over TLS. Windows 10 Pro 22H2 and Server 2016 remain project targets; TLS 1.2 must remain available. Pinning authenticates the exact certificate copied in the connection URL, including when a reachable alias/IP differs from its name. Schannel requires an OS-accessible private key: Windows imports the generated identity into a temporary user key container without PersistKeySet, which is cleaned up with certificate disposal. No trusted-root certificate installation is required. A forced process termination can leave OS-managed key material; a new identity and token are generated at the next start.
+
+Cross-platform client CI does not constitute runtime/OS acceptance on each Windows target. See the acceptance checklist for TLS, authentication and actual package checks.

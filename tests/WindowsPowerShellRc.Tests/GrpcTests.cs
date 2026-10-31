@@ -69,7 +69,9 @@ public class GrpcTests
     {
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var request = new CertificateRequest("CN=expired-test", key, HashAlgorithmName.SHA256);
-        using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-2), DateTimeOffset.UtcNow.AddDays(-1));
+        using var generated = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-2), DateTimeOffset.UtcNow.AddDays(-1));
+        using var imported = OperatingSystem.IsWindows() ? X509CertificateLoader.LoadPkcs12(generated.Export(X509ContentType.Pfx), null, X509KeyStorageFlags.UserKeySet) : null;
+        var certificate = imported ?? generated;
         await using var server = await TestGrpcServer.Start(certificate: certificate);
         using var channel = server.Address.CreateChannel();
         await Assert.ThrowsAsync<RpcException>(async () => await new Diagnostics.DiagnosticsClient(channel).GetInfoAsync(new(), server.Address.Headers));

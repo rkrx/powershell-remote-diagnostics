@@ -85,8 +85,16 @@ jobs:
           if-no-files-found: error
           retention-days: 30
   macos:
-    name: Package and test macOS arm64 client
-    runs-on: macos-15
+    name: Package and test macOS client (${{ matrix.rid }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: osx-arm64
+            runner: macos-15
+          - rid: osx-x64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     defaults:
       run:
@@ -102,12 +110,12 @@ jobs:
       - run: dotnet restore --locked-mode
       - run: dotnet test -c Release -m:1 --no-restore --blame-hang-timeout 2m
       - name: Build self-contained macOS client
-        run: ./scripts/Publish-Package.ps1 -Component Client -Runtime osx-arm64
+        run: ./scripts/Publish-Package.ps1 -Component Client -Runtime ${{ matrix.rid }}
       - name: Test extracted macOS client MCP connection
         run: |
           $root = Join-Path $env:RUNNER_TEMP ("rc-client-" + [guid]::NewGuid())
           New-Item -ItemType Directory $root | Out-Null
-          tar -xzf ./artifacts/WindowsPowerShellRc-Client-osx-arm64.tar.gz -C $root
+          tar -xzf ./artifacts/WindowsPowerShellRc-Client-${{ matrix.rid }}.tar.gz -C $root
           $env:RC_TEST_CLIENT_EXECUTABLE = Join-Path $root 'WindowsPowerShellRc.Client.app/Contents/MacOS/WindowsPowerShellRc.Client'
           try {
             & $env:RC_TEST_CLIENT_EXECUTABLE --version
@@ -119,8 +127,8 @@ jobs:
           }
       - uses: actions/upload-artifact@v7
         with:
-          name: WindowsPowerShellRc-Client-osx-arm64.tar.gz
-          path: artifacts/WindowsPowerShellRc-Client-osx-arm64.tar.gz
+          name: WindowsPowerShellRc-Client-${{ matrix.rid }}.tar.gz
+          path: artifacts/WindowsPowerShellRc-Client-${{ matrix.rid }}.tar.gz
           archive: false
           if-no-files-found: error
           retention-days: 30
@@ -148,7 +156,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag || github.ref_name }}
         run: |
-          packages=(release/WindowsPowerShellRc-Server-win-x64.zip release/WindowsPowerShellRc-Client-win-x64.zip release/WindowsPowerShellRc-Client-osx-arm64.tar.gz)
+          packages=(release/WindowsPowerShellRc-Server-win-x64.zip release/WindowsPowerShellRc-Client-win-x64.zip release/WindowsPowerShellRc-Client-osx-arm64.tar.gz release/WindowsPowerShellRc-Client-osx-x64.tar.gz)
           for package in "${packages[@]}"; do test -s "$package"; done
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" "${packages[@]}" --clobber

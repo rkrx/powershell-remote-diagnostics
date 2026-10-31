@@ -13,7 +13,7 @@ dotnet test -c Release -m:1 --no-restore
 - `src/WindowsPowerShellRc.Transport`: PowerShell-free protobuf contracts, strict connection-string parsing and pinned TLS channel creation.
 - `src/WindowsPowerShellRc.Client`: local MCP stdio host, retained connections and optional Avalonia input subprocess.
 
-Server startup generates an ephemeral certificate and access key. The versioned opaque connection token contains the key and certificate fingerprint. Pinning replaces CA/hostname trust with the exact copied certificate identity and enforces certificate validity. Do not add a blanket certificate-validation callback, plaintext fallback or automatic execution retry.
+Server startup generates a process-specific certificate and access key. On Windows its private key uses a temporary OS-managed user container for Schannel compatibility (no PersistKeySet); normal certificate disposal removes the key. The versioned opaque connection token contains the key and certificate fingerprint. Pinning replaces CA/hostname trust with the exact copied certificate identity and enforces certificate validity. Do not add a blanket certificate-validation callback, plaintext fallback or automatic execution retry.
 
 MCP stdout must contain only protocol messages. Do not register ordinary console log providers or log tool arguments. GUI entry uses an inherited anonymous pipe; secrets are not process arguments, environment variables or temporary files. A supplied complete URL bypasses the prompt. Failed supplied URLs do not open GUI automatically.
 
