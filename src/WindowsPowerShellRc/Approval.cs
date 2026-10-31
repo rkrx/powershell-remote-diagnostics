@@ -31,7 +31,7 @@ public sealed class ConsoleApproval(bool auto, ConsoleTerminal? terminal = null)
     public async Task<bool> ConfirmAsync(Execution execution, CancellationToken cancellationToken)
     {
         terminal.Request(execution);
-        if (auto) { terminal.Decision("Auto mode: approved."); return true; }
+        if (auto) { terminal.Decision("Auto mode: approved.", success: true); return true; }
         while (Console.KeyAvailable) Console.ReadKey(intercept: true);
         var input = new StringBuilder();
         terminal.Question($"Approve {execution.Id}? [y/n] ");
@@ -46,14 +46,14 @@ public sealed class ConsoleApproval(bool auto, ConsoleTerminal? terminal = null)
                 {
                     Console.WriteLine();
                     string answer = input.ToString().Trim(); input.Clear();
-                    if (answer.Equals("y", StringComparison.OrdinalIgnoreCase)) { terminal.Decision($"Approved: {execution.Id}"); return true; }
-                    if (answer.Equals("n", StringComparison.OrdinalIgnoreCase)) { terminal.Decision($"Denied: {execution.Id}"); return false; }
+                    if (answer.Equals("y", StringComparison.OrdinalIgnoreCase)) { terminal.Decision($"Approved: {execution.Id}", success: true); return true; }
+                    if (answer.Equals("n", StringComparison.OrdinalIgnoreCase)) { terminal.Decision($"Denied: {execution.Id}", success: false); return false; }
                     terminal.Question($"Approve {execution.Id}? Enter y or n: ");
                 }
                 else if (key.Key == ConsoleKey.Backspace && input.Length > 0) { input.Length--; Console.Write("\b \b"); }
                 else if (!char.IsControl(key.KeyChar) && input.Length < 32) { input.Append(key.KeyChar); Console.Write(key.KeyChar); }
             }
         }
-        catch (OperationCanceledException) { terminal.Decision($"\nApproval cancelled: {execution.Id}"); throw; }
+        catch (OperationCanceledException) { terminal.Decision($"\nApproval cancelled: {execution.Id}", success: false); throw; }
     }
 }

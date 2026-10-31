@@ -24,11 +24,20 @@ public sealed class ConsoleTerminal
         }
     }
 
-    public void Request(Execution execution) => Write(
-        $"\nRequest {execution.Id}\nReason: {ConsoleApproval.Escape(execution.Request.Reason)}\nScript:\n{ConsoleApproval.Escape(execution.Script)}\n",
-        ConsoleColor.Magenta);
+    public void Request(Execution execution)
+    {
+        Write($"\nRequest {execution.Id}\n", ConsoleColor.DarkMagenta);
+        Write($"Reason: {ConsoleApproval.Escape(execution.Request.Reason)}\n", ConsoleColor.Cyan);
+        int width = 100;
+        if (!Console.IsOutputRedirected)
+        {
+            try { if (Console.WindowWidth > 1) width = Console.WindowWidth - 1; }
+            catch (IOException) { }
+        }
+        Write($"Script:\n{ScriptDisplay.Format(execution.Script, execution.Request.Reason, width)}\n", ConsoleColor.Yellow);
+    }
 
-    public void Question(string text) => Write(text, ConsoleColor.Green);
-    public void Decision(string text) => Write(text + Environment.NewLine, ConsoleColor.Cyan);
+    public void Question(string text) => Write(text, ConsoleColor.Magenta);
+    public void Decision(string text, bool success) => Write(text + Environment.NewLine, success ? ConsoleColor.Green : ConsoleColor.Red);
     public void Output(string stream, string text) => Write(ConsoleApproval.Escape(text) + Environment.NewLine);
 }

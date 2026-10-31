@@ -4,7 +4,7 @@ try
 {
     var options = CliOptions.Parse(args);
     if (options.Help) { Console.WriteLine(CliOptions.Usage); return 0; }
-    if (options.Version) { Console.WriteLine("Windows-Powershell-RC 0.1.1"); return 0; }
+    if (options.Version) { Console.WriteLine("Windows-Powershell-RC 0.1.2"); return 0; }
     if (!options.Auto && (Console.IsInputRedirected || Console.IsOutputRedirected))
         throw new ArgumentException("Manual mode requires an interactive console. Use --auto explicitly for unattended operation.");
     string declaration = options.ReadDeclaration();
@@ -20,7 +20,7 @@ try
             foreach (var address in addresses) server.Listen(address, options.Port);
         }));
     await app.StartAsync();
-    Console.WriteLine($"Windows-Powershell-RC 0.1.1 — embedded PowerShell {engine.Version}");
+    Console.WriteLine($"Windows-Powershell-RC 0.1.2 — embedded PowerShell {engine.Version}");
     foreach (string url in app.Urls) Console.WriteLine($"HTTP: {url}");
     Console.WriteLine($"Environment: {(options.Test ? "TEST" : "PRODUCTION")}; approval: {(options.Auto ? "AUTO" : "MANUAL")}");
     Console.WriteLine($"Declaration:\n{ConsoleApproval.Escape(declaration)}");

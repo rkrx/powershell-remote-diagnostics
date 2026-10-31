@@ -20,7 +20,9 @@ Open an interactive terminal in the extracted directory:
 
 The console displays the listening addresses, environment mode, declaration, embedded engine version, and a randomly generated Bearer token. Keep the terminal open. Press Ctrl+C to stop the server.
 
-Approval questions appear in green, script requests in purple, and approval decisions in cyan. Captured script output (including errors, warnings, and information) is also mirrored to the terminal in its default color. Terminal control characters in requests and mirrored output are escaped; redirected console output contains no added color codes.
+Approval questions appear in light purple; approvals are green and denials/cancellations red. The request header is purple, the reason cyan, and the script yellow. Script blocks and pipelines are indented for review, and long lines wrap to the terminal width with a `↪` continuation marker without truncation. Wrapping and indentation affect only the display; execution uses the original submitted script. With redirected output, the display uses a 100-column width and no added color codes.
+
+Agents must submit readable multiline scripts with four-space indentation and an introductory comment for complex commands. If a complex script lacks a leading comment, the terminal displays its supplied reason as an introductory comment. Captured script output (including errors, warnings, and information) is mirrored in the default terminal color. Terminal control characters in requests and mirrored output are escaped.
 
 The example binds to the local computer. Omitting `--bind` uses the default of all interfaces. The application does not install a service, create firewall rules, or elevate its privileges. Scripts run with the permissions of the account that starts the application.
 
@@ -54,7 +56,11 @@ Invoke-RestMethod "$base/" -Headers $headers
 
 # Submit one script as an array of lines.
 $body = @{
-    commands = @('$diagnosticValue = 42', '$diagnosticValue')
+    commands = @(
+        '# Store a synthetic value in this session and return it.'
+        '$diagnosticValue = 42'
+        '$diagnosticValue'
+    )
     reason = 'Verify execution and the persistent session'
 } | ConvertTo-Json
 

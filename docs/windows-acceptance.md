@@ -7,7 +7,8 @@ Perform on Windows 10 Pro 22H2 x64, Windows 11 x64 and Windows Server 2016/2022/
 - [ ] Unzip the complete package; `WindowsPowerShellRc.exe --help` and `--version` work without installation.
 - [ ] Start bound to `127.0.0.1`; startup reports embedded PowerShell 7.6.8, production/manual defaults, declaration and a random token.
 - [ ] With no separate PowerShell 7 installation, execute `'ready'; Get-Date; Get-Item -LiteralPath $PSHOME` through REST. Confirm built-in modules load from the extracted package's `Modules` directory, including when starting from another working directory.
-- [ ] Approval questions are green, script requests purple, decisions cyan, and captured output is mirrored in the default terminal color. Redirected output has no added color codes.
+- [ ] Approval questions are light purple, approvals green, denials/cancellations red, request headers purple, reasons cyan, and scripts yellow. Captured output is mirrored in the default terminal color. Redirected output has no added color codes.
+- [ ] Resize the terminal and submit a long multiline script. The script display fits the window with indentation and marked continuation lines; no source is truncated, and execution uses the original script. Complex scripts have an explanatory introductory comment.
 - [ ] GET / and all execution/output/search/cancel paths reject missing/wrong tokens with 401.
 - [ ] Authenticated GET / reports the actual OS/build, computer name, user/domain, OS/process architectures and .NET runtime, as well as production/test and PowerShell version.
 - [ ] Submit `$rcValue = 42` with a reason. Full script/reason appear; n denies, y executes. A later `$rcValue` returns 42.

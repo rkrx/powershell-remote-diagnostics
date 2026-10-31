@@ -33,9 +33,25 @@ public static class AgentGuide
 
         `POST /executions`
         ```json
-        {"commands":["$services = Get-Service","$services | Select-Object -First 10"],"reason":"Inspect service state without making changes"}
+        {
+          "commands": [
+            "# Read service states and show a small sample without changing services.",
+            "$services = Get-Service",
+            "$services |",
+            "    Select-Object -First 10"
+          ],
+          "reason": "Inspect service state without making changes"
+        }
         ```
         The string array is joined with LF into ONE script, with one approval and one UUID per POST.
+        Write scripts for the human operator reviewing them: use descriptive variable names,
+        multiple lines, four-space indentation, and short readable lines (aim for 100 columns).
+        Do not compress commands into semicolon-separated one-liners to save characters.
+        Begin complex scripts (multiple steps, pipelines, loops, conditions, or functions) with
+        a PowerShell comment explaining what the script does and what it reads or changes.
+        Add comments before non-obvious steps. The reason field explains why the request is needed;
+        it does not replace these script comments. The terminal wraps the display to its window width;
+        execution always uses your original script, not the display layout.
         A single persistent session keeps variables, functions, modules and working location.
         Scripts run serially, FIFO. Interactive prompts, credentials and Read-Host are unsupported.
         Test/auto modes do not grant more rights or override the declaration.
