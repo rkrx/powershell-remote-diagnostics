@@ -13,7 +13,7 @@ Download the appropriate archives from [GitHub Releases](https://github.com/rkrx
 
 New CI builds and releases provide Windows packages only. Older releases may still contain macOS archives; macOS source development remains available.
 
-Extract the entire package. Each Windows archive has its executable at the root and all accompanying files under `support/`. Keep that directory with the executable. Standard .NET single-file publishing bundles the managed application and extracts native dependencies to its runtime cache on first start; the RC loads its physical PowerShell modules from `support/Modules`. Neither component requires a separate .NET or PowerShell installation.
+Extract the entire package. Each Windows archive has its executable at the root and all accompanying files under `support/`. Keep that directory with the executable. Packages include this README, the license, platform guidance and a deployment acceptance checklist; development notes and design/implementation plans remain in the repository. Standard .NET single-file publishing bundles the managed application and extracts native dependencies to its runtime cache on first start; the RC loads its physical PowerShell modules from `support/Modules`. Neither component requires a separate .NET or PowerShell installation.
 
 **The server includes its own PowerShell 7 engine**, embedded through the official `Microsoft.PowerShell.SDK`. No PowerShell installation, WinRM setup or PowerShell fallback is required on the target. The client does not include or require PowerShell.
 
@@ -106,7 +106,7 @@ Protobuf JSON represents 64-bit line coordinates as decimal strings. Optional fi
 
 ## Protocol and migration
 
-Version 0.2 replaces REST entirely. `GET /` and `/executions` are no longer supported. Version 0.3 adds mandatory diagnostic session streams and is incompatible with 0.2 clients: upgrade client and RC together. Old bearer-only requests return a session-required error. The versioned protobuf contract is [diagnostics.proto](src/WindowsPowerShellRc.Transport/diagnostics.proto); gRPC methods include `Session`, `GetInfo`, `Execute`, `GetExecution`, `ReadOutput`, `Search` and `Cancel`. All require authentication over pinned TLS. There is no plaintext fallback or certificate-verification bypass.
+Version 0.2 replaces REST entirely. `GET /` and `/executions` are no longer supported. Version 0.3 adds mandatory diagnostic session streams and is incompatible with 0.2 clients: upgrade client and RC together. Old bearer-only requests return a session-required error. The versioned protobuf contract is [diagnostics.proto](https://github.com/rkrx/powershell-remote-diagnostics/blob/main/src/WindowsPowerShellRc.Transport/diagnostics.proto); gRPC methods include `Session`, `GetInfo`, `Execute`, `GetExecution`, `ReadOutput`, `Search` and `Cancel`. All require authentication over pinned TLS. There is no plaintext fallback or certificate-verification bypass.
 
 Connection/session logs contain a timestamp, nonsecret session ID and direct/relay mode. They never include access tokens or complete connection URLs. A failed session is not automatically reopened; disconnect the local entry and explicitly connect again. Accepted executions and the persistent runspace survive client disconnects, so a new admitted client can inspect retained UUID results.
 
@@ -114,7 +114,7 @@ Common gRPC errors: `AlreadyExists` for an occupied client slot, `Unauthenticate
 
 ## Build and validation
 
-Use .NET 10, locked dependency restores and the [development instructions](docs/development.md). Windows support targets include Windows 10 Pro 22H2 x64 and Windows Server 2016; see [platform qualification](docs/platform-support.md) and the [acceptance checklist](docs/windows-acceptance.md). CI does not replace acceptance on each actual target OS.
+Use .NET 10, locked dependency restores and the [development instructions](https://github.com/rkrx/powershell-remote-diagnostics/blob/main/docs/development.md). Windows support targets include Windows 10 Pro 22H2 x64 and Windows Server 2016; see [platform qualification](docs/platform-support.md) and the [acceptance checklist](docs/windows-acceptance.md). CI does not replace acceptance on each actual target OS.
 
 ```powershell
 ./scripts/Publish-Windows.ps1

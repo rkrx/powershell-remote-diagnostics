@@ -34,7 +34,12 @@ foreach ($file in Get-ChildItem $output -File | Where-Object { $_.Name -like 'Wi
 }
 Copy-Item (Join-Path $repo 'README.md') $output -Force
 Copy-Item (Join-Path $repo 'LICENSE') $output -Force
-Copy-Item (Join-Path $repo 'docs') $output -Recurse -Force
+# Ship deployment documentation explicitly; developer material stays in the repository.
+$packageDocs = Join-Path $output 'docs'
+New-Item -ItemType Directory -Path $packageDocs -Force | Out-Null
+foreach ($document in @('platform-support.md', 'windows-acceptance.md')) {
+    Copy-Item (Join-Path $repo "docs/$document") $packageDocs -Force
+}
 $name = "WindowsPowerShellRc-$Component-$Runtime"
 if ($Runtime.StartsWith('win')) {
     # Standard .NET single-file host; external engine assets stay physical below support.
