@@ -37,3 +37,5 @@ The server distribution remains Windows x64 only. New CI builds distribute the l
 The server uses HTTP/2 over TLS. Windows 10 Pro 22H2 and Server 2016 remain project targets; TLS 1.2 must remain available. Pinning authenticates the exact certificate copied in the connection URL, including when a reachable alias/IP differs from its name. Schannel requires an OS-accessible private key: Windows imports the generated identity into a temporary user key container without PersistKeySet, which is cleaned up with certificate disposal. No trusted-root certificate installation is required. A forced process termination can leave OS-managed key material; a new identity and token are generated at the next start.
 
 Windows CI does not constitute runtime/OS acceptance on each Windows target. See the acceptance checklist for TLS, authentication and actual package checks.
+
+Version 0.3 native Windows Server 2022 CI passes the full suite and extracted Windows client/RC packages, including the relay path. This is not evidence of runtime acceptance on Windows 10 Pro 22H2 or Server 2016.
