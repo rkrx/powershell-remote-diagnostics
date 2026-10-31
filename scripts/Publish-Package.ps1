@@ -11,7 +11,7 @@ $project = if ($Component -eq 'Server') { 'src/WindowsPowerShellRc' } else { 'sr
 $output = Join-Path $repo "artifacts/$($Component.ToLowerInvariant())/$Runtime"
 if (Test-Path $output) { Remove-Item $output -Recurse -Force }
 $publishFlags = if ($Runtime.StartsWith('win')) { @('-p:PublishSingleFile=true', '-p:IncludeNativeLibrariesForSelfExtract=true') } else { @() }
-& dotnet publish (Join-Path $repo $project) -c Release -r $Runtime --self-contained true -p:PublishTrimmed=false -p:RestoreLockedMode=true -o $output @publishFlags
+& dotnet publish (Join-Path $repo $project) -c Release -r $Runtime --self-contained true -p:PublishTrimmed=false -p:RestoreLockedMode=true -p:DebugType=None -p:DebugSymbols=false -o $output @publishFlags
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed.' }
 $binary = if ($Component -eq 'Server') { 'powershell-rc' } else { 'WindowsPowerShellRc.Client' }
 $executable = $binary + $(if ($Runtime.StartsWith('win')) { '.exe' } else { '' })
@@ -32,16 +32,41 @@ foreach ($file in Get-ChildItem $output -File | Where-Object { $_.Name -like 'Wi
         if ($text.Contains($repo) -or $text.Contains($repo.Replace('\', '/'))) { throw "Build checkout path detected in $($file.Name)." }
     }
 }
-Copy-Item (Join-Path $repo 'README.md') $output -Force
+# Runtime-only downloads: project docs stay on GitHub. Preserve redistribution notices.
 Copy-Item (Join-Path $repo 'LICENSE') $output -Force
-# Ship deployment documentation explicitly; developer material stays in the repository.
-$packageDocs = Join-Path $output 'docs'
-New-Item -ItemType Directory -Path $packageDocs -Force | Out-Null
-foreach ($document in @('platform-support.md', 'windows-acceptance.md')) {
-    Copy-Item (Join-Path $repo "docs/$document") $packageDocs -Force
+Get-ChildItem $output -Filter '*.pdb' -File -Recurse | Remove-Item -Force
+if ($Runtime.StartsWith('win')) {
+    # IIS/static-web-asset and SDK build metadata do not participate in this CLI host.
+    foreach ($artifact in @('web.config', "$binary.staticwebassets.endpoints.json", 'build.manifest', 'build.manifest.sig')) {
+        $path = Join-Path $output $artifact
+        if (Test-Path $path) { Remove-Item $path -Force }
+    }
+    if ($Component -eq 'Server') {
+        # The publish target has staged the required Windows modules under Modules/.
+        # Drop SDK copies for both platforms; retain any other future runtime assets.
+        foreach ($platform in @('win', 'unix')) {
+            $duplicate = Join-Path $output "runtimes/$platform/lib/net10.0/Modules"
+            if (Test-Path $duplicate) { Remove-Item $duplicate -Recurse -Force }
+        }
+        $runtimeDirectory = Join-Path $output 'runtimes'
+        if (Test-Path $runtimeDirectory) {
+            Get-ChildItem $runtimeDirectory -Directory -Recurse |
+                Sort-Object { $_.FullName.Length } -Descending | ForEach-Object {
+                    if ([IO.Directory]::GetFileSystemEntries($_.FullName).Length -eq 0) { Remove-Item $_.FullName }
+                }
+            if ([IO.Directory]::GetFileSystemEntries($runtimeDirectory).Length -eq 0) { Remove-Item $runtimeDirectory }
+        }
+    }
 }
 $name = "WindowsPowerShellRc-$Component-$Runtime"
 if ($Runtime.StartsWith('win')) {
+    # New unbundled assets must be reviewed explicitly instead of silently growing downloads.
+    $unexpected = @(Get-ChildItem $output -File -Recurse | Where-Object {
+        $relative = [IO.Path]::GetRelativePath($output, $_.FullName).Replace('\', '/')
+        $relative -ne $executable -and $relative -ne 'LICENSE' -and
+            -not ($Component -eq 'Server' -and $relative.StartsWith('Modules/'))
+    })
+    if ($unexpected.Count -ne 0) { throw "Unexpected release asset: $($unexpected[0].Name)" }
     # Standard .NET single-file host; external engine assets stay physical below support.
     $support = Join-Path $output 'support'
     New-Item -ItemType Directory -Path $support -Force | Out-Null

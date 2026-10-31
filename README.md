@@ -13,7 +13,7 @@ Download the appropriate archives from [GitHub Releases](https://github.com/rkrx
 
 New CI builds and releases provide Windows packages only. Older releases may still contain macOS archives; macOS source development remains available.
 
-Extract the entire package. Each Windows archive has its executable at the root and all accompanying files under `support/`. Keep that directory with the executable. Packages include this README, the license, platform guidance and a deployment acceptance checklist; development notes and design/implementation plans remain in the repository. Standard .NET single-file publishing bundles the managed application and extracts native dependencies to its runtime cache on first start; the RC loads its physical PowerShell modules from `support/Modules`. Neither component requires a separate .NET or PowerShell installation.
+Extract the entire package. Each Windows archive has its executable at the root and all accompanying files under `support/`. Keep that directory with the executable. Downloads contain only the executable, required runtime/module assets and redistribution license notices. Documentation, debug symbols and build metadata are excluded; read the operating instructions here on GitHub. Standard .NET single-file publishing bundles the managed application and extracts native dependencies to its runtime cache on first start; the RC loads its physical PowerShell modules from `support/Modules`. Neither component requires a separate .NET or PowerShell installation.
 
 **The server includes its own PowerShell 7 engine**, embedded through the official `Microsoft.PowerShell.SDK`. No PowerShell installation, WinRM setup or PowerShell fallback is required on the target. The client does not include or require PowerShell.
 
