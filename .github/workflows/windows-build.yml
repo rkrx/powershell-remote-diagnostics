@@ -37,7 +37,16 @@ jobs:
           cache: true
           cache-dependency-path: '**/packages.lock.json'
       - name: Restore locked dependencies
-        run: dotnet restore --locked-mode
+        run: |
+          $output = & dotnet restore --locked-mode 2>&1
+          $result = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          if ($result -ne 0) {
+            $output | Where-Object { "$_" -match ': error ' } | ForEach-Object {
+              Write-Host ("::error::" + "$_".Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A'))
+            }
+            exit $result
+          }
       - name: Run Windows suite
         run: dotnet test -c Release -m:1 --no-restore --blame-hang-timeout 2m --logger "trx;LogFileName=windows-tests.trx" --results-directory TestResults
       - name: Build separate self-contained packages
