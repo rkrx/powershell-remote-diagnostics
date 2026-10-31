@@ -77,6 +77,34 @@ public class GrpcTests
         await Assert.ThrowsAsync<RpcException>(async () => await new Diagnostics.DiagnosticsClient(channel).GetInfoAsync(new(), server.Address.Headers));
     }
 
+    [Fact]
+    public async Task CancellingTheGrpcRequestDoesNotCancelAcceptedExecution()
+    {
+        using var engine = new FakeEngine { Release = new(TaskCreationOptions.RunContinuationsAsynchronously) };
+        var approval = new CaptureApproval();
+        await using var server = await TestGrpcServer.Start(engine, approval: approval, wait: TimeSpan.FromSeconds(15));
+        using var channel = server.Address.CreateChannel();
+        var client = new Diagnostics.DiagnosticsClient(channel);
+        var request = new ExecuteRequest { Reason = "Verify interrupted request semantics" }; request.Commands.Add("accepted work");
+        using var cancel = new CancellationTokenSource();
+        using var call = client.ExecuteAsync(request, server.Address.Headers, cancellationToken: cancel.Token);
+        var job = await approval.Accepted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        for (int i=0; i<100 && engine.Calls == 0; i++) await Task.Delay(5);
+        cancel.Cancel();
+        Assert.Equal(StatusCode.Cancelled, (await Assert.ThrowsAsync<RpcException>(async () => await call.ResponseAsync)).StatusCode);
+        Assert.False(job.IsTerminal);
+        engine.Release.SetResult();
+        await job.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("completed", job.Status);
+        var final = await client.GetExecutionAsync(new() { Id = job.Id.ToString() }, server.Address.Headers);
+        Assert.Equal("completed", final.Status); Assert.Equal(1, engine.Calls);
+    }
+    private sealed class CaptureApproval : IApproval
+    {
+        public TaskCompletionSource<Execution> Accepted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task<bool> ConfirmAsync(Execution execution, CancellationToken token) { Accepted.TrySetResult(execution); return Task.FromResult(true); }
+    }
+
     private static async Task<ExecutionReply> WaitForStatus(Diagnostics.DiagnosticsClient c, Metadata h, string id)
     {
         for (int i=0;i<100;i++) { var r = await c.GetExecutionAsync(new() { Id=id },h); if(r.OutputReady) return r; await Task.Delay(10); }
@@ -90,12 +118,12 @@ internal sealed class TestGrpcServer : IAsyncDisposable
     private Microsoft.AspNetCore.Builder.WebApplication app = null!;
     public ExecutionQueue Queue { get; private set; } = null!;
     public ConnectionAddress Address { get; private set; } = null!;
-    public static async Task<TestGrpcServer> Start(IPowerShellEngine? engine = null, X509Certificate2? certificate = null)
+    public static async Task<TestGrpcServer> Start(IPowerShellEngine? engine = null, X509Certificate2? certificate = null, IApproval? approval = null, TimeSpan? wait = null)
     {
         var server = new TestGrpcServer();
-        server.Queue = new ExecutionQueue(engine ?? new FakeEngine(), new AutoApproval(), server.store);
+        server.Queue = new ExecutionQueue(engine ?? new FakeEngine(), approval ?? new AutoApproval(), server.store);
         server.app = GrpcApi.Build(new(Auto: true), "CUSTOM POLICY", server.Identity, server.Queue, "7.test", b =>
-            b.WebHost.ConfigureKestrel(k => k.Listen(IPAddress.Loopback, 0, l => { l.Protocols = HttpProtocols.Http2; l.UseHttps(certificate ?? server.Identity.Certificate); })), TimeSpan.FromMilliseconds(30));
+            b.WebHost.ConfigureKestrel(k => k.Listen(IPAddress.Loopback, 0, l => { l.Protocols = HttpProtocols.Http2; l.UseHttps(certificate ?? server.Identity.Certificate); })), wait ?? TimeSpan.FromMilliseconds(30));
         await server.app.StartAsync();
         server.Address = new ConnectionAddress("127.0.0.1", new Uri(server.app.Urls.Single()).Port, server.Identity.Key.Value, (certificate ?? server.Identity.Certificate).GetCertHashString(HashAlgorithmName.SHA256).ToLowerInvariant());
         return server;
