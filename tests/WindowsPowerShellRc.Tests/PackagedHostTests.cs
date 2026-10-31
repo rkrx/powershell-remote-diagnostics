@@ -50,10 +50,11 @@ public class PackagedHostTests
             var response = await client.PostAsJsonAsync("/executions", new { commands = new[] { script }, reason = "Verify bundled modules and console output" });
             response.EnsureSuccessStatusCode();
             var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-            string output = body.GetProperty("output").ToString();
+            string output = string.Join("\n", body.GetProperty("output").GetProperty("lines")
+                .EnumerateArray().Select(line => line.GetProperty("text").GetString()));
             Assert.True(body.GetProperty("status").GetString() == "completed", output);
             Assert.Contains("bundled-engine-ready", output);
-            Assert.Contains(packageDirectory, output);
+            Assert.True(output.Contains(packageDirectory, StringComparison.OrdinalIgnoreCase), output);
             Assert.Contains("True", output);
         }
         finally
