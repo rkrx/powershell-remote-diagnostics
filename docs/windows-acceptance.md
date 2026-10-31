@@ -16,9 +16,9 @@ Test the server on Windows 10 Pro 22H2 x64, Windows 11 x64 and Windows Server 20
 - [ ] Verify denial, queued/running cancellation, native exit codes and native processes receiving EOF on stdin.
 - [ ] Retrieve more than 200 output lines, a line longer than 4096 codepoints, Unicode offsets, search context and cursor pages. Verify retention evicts the oldest of 21 completed results.
 - [ ] Disconnect a client while work is running: no duplicate submission or implicit cancellation. Restart server: old URL fails, new URL succeeds, session/results reset.
-- [ ] Verify the Windows and macOS client packages run without PowerShell or a separate .NET installation. Verify MCP stdout contains protocol only.
+- [ ] Verify the Windows client package runs without PowerShell or a separate .NET installation. Verify MCP stdout contains protocol only.
 
-Interactive server applications, credential/UAC prompts and rollback of executed scripts are not provided. Forced termination can leave temporary output files. Automated CI on Server 2022 and local macOS checks do not complete acceptance on other target OS versions. macOS client archives are not Developer ID signed/notarized.
+Interactive server applications, credential/UAC prompts and rollback of executed scripts are not provided. Forced termination can leave temporary output files. Automated CI on Server 2022 and local macOS checks do not complete acceptance on other target OS versions. No new macOS archives are published; historic archives are not Developer ID signed/notarized.
 
 ## Relay and exclusive sessions (0.3)
 

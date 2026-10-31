@@ -32,7 +32,7 @@ Authenticated `GetInfo` (MCP `server_info`) reports production/test mode, approv
 
 ## Client targets and TLS
 
-The server distribution remains Windows x64 only. New CI builds distribute the local MCP client separately for Windows x64 only. macOS (Apple Silicon and Intel) source builds remain available; macOS release packaging in CI is disabled. Linux is deferred. Client packages include .NET, gRPC/MCP and the optional Avalonia UI, without the PowerShell engine.
+The server distribution remains Windows x64 only. New CI builds distribute the local MCP client separately for Windows x64 only. macOS (Apple Silicon and Intel) source builds remain available; macOS release packaging in CI is disabled. Linux client/RC distribution is deferred; the relay can be built and run from source on Linux with the .NET 10 SDK (see README). Linux relay runtime acceptance has not been performed locally. Client packages include .NET, gRPC/MCP and the optional Avalonia UI, without the PowerShell engine.
 
 The server uses HTTP/2 over TLS. Windows 10 Pro 22H2 and Server 2016 remain project targets; TLS 1.2 must remain available. Pinning authenticates the exact certificate copied in the connection URL, including when a reachable alias/IP differs from its name. Schannel requires an OS-accessible private key: Windows imports the generated identity into a temporary user key container without PersistKeySet, which is cleaned up with certificate disposal. No trusted-root certificate installation is required. A forced process termination can leave OS-managed key material; a new identity and token are generated at the next start.
 

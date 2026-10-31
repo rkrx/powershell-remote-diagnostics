@@ -1,6 +1,6 @@
 # Reverse relay, exclusive sessions, and Windows distribution
 
-Status: reviewed draft for approval. Independent builder check found no important planning gaps. Supersedes the client-disconnect port-release requirement: the owner explicitly decided that a port belongs to an RC until that RC's relay connection ends.
+Status: approved by the owner on 2026-10-31. Independent builder check found no important planning gaps. Supersedes the client-disconnect port-release requirement: the owner explicitly decided that a port belongs to an RC until that RC's relay connection ends.
 
 ## Intent and constraints
 

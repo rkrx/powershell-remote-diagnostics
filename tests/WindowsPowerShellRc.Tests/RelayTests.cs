@@ -178,6 +178,81 @@ public class RelayTests
     }
 
     [Fact]
+    public async Task PublicSocketChurnCannotTerminateRcRegistration()
+    {
+        using var target = new TcpListener(IPAddress.Loopback, 0); target.Start();
+        using var stop = new CancellationTokenSource();
+        async Task Drain()
+        {
+            try { while (true) { using var socket = await target.AcceptTcpClientAsync(stop.Token); } }
+            catch (OperationCanceledException) { }
+        }
+        var draining = Drain();
+        await using var relay = await TestRelay.Start();
+        var ready = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var agent = RelayAgent.RunAsync(relay.Address, ((IPEndPoint)target.LocalEndpoint).Port, (_, p) => ready.TrySetResult(p), stop.Token);
+        try
+        {
+            int port = await ready.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            for (int round=0; round<200 && !agent.IsCompleted; round++)
+            {
+                await Task.WhenAll(Enumerable.Range(0,8).Select(async _ =>
+                {
+                    using var tcp = new TcpClient();
+                    tcp.LingerState = new LingerOption(true,0);
+                    await tcp.ConnectAsync(IPAddress.Loopback, port);
+                }));
+            }
+            if (agent.IsCompleted) await agent;
+            Assert.False(agent.IsCompleted);
+            using var last = new TcpClient(); await last.ConnectAsync(IPAddress.Loopback, port);
+        }
+        finally { stop.Cancel(); try { await agent; } catch (OperationCanceledException) { } await draining; }
+    }
+
+    [Fact]
+    public async Task BackpressuredControlResponsesCannotPreventHeartbeatExpiry()
+    {
+        await using var relay = await TestRelay.Start(rangeSize: 0);
+        using var channel = relay.Address.CreateChannel();
+        var client = new WindowsPowerShellRc.Protocol.Relay.RelayClient(channel);
+        using var call = client.Register(relay.Address.Headers);
+        Assert.True(await call.ResponseStream.MoveNext(default)); int port = call.ResponseStream.Current.Port;
+        int sent = 0;
+        async Task Flood()
+        {
+            try
+            {
+                for (int i=0; i<500000; i++)
+                {
+                    await call.RequestStream.WriteAsync(new() { Heartbeat = true });
+                    Interlocked.Increment(ref sent);
+                }
+            }
+            catch (Exception ex) when (ex is RpcException or IOException or InvalidOperationException) { }
+        }
+        var flood = Flood();
+        // Do not consume heartbeat responses. Detect actual HTTP/2 backpressure.
+        int last = -1;
+        for (int i=0; i<200; i++)
+        {
+            await Task.Delay(100);
+            int now = Volatile.Read(ref sent);
+            if (now == last && now > 1000) break;
+            last = now;
+        }
+        Assert.False(flood.IsCompleted);
+        await Task.Delay(TimeSpan.FromSeconds(21));
+        using var replacement = client.Register(relay.Address.Headers);
+        try
+        {
+            Assert.True(await replacement.ResponseStream.MoveNext(default).WaitAsync(TimeSpan.FromSeconds(3)));
+            Assert.Equal(port, replacement.ResponseStream.Current.Port);
+        }
+        finally { call.Dispose(); await flood.WaitAsync(TimeSpan.FromSeconds(3)); }
+    }
+
+    [Fact]
     public async Task RealTlsDiagnosticsPassThroughRelayAndClientReconnectKeepsTheSamePort()
     {
         await using var rc = await TestGrpcServer.Start();
@@ -221,13 +296,13 @@ internal sealed class TestRelay : IAsyncDisposable
     private readonly ServerIdentity identity = new();
     private Microsoft.AspNetCore.Builder.WebApplication app = null!;
     public ConnectionAddress Address { get; private set; } = null!;
-    public static async Task<TestRelay> Start()
+    public static async Task<TestRelay> Start(int rangeSize = 20)
     {
         var result = new TestRelay();
         // Reserve a candidate range only for the fixture; production allocation itself binds atomically.
         using var probe = new TcpListener(IPAddress.Loopback, 0); probe.Start();
         int port = ((IPEndPoint)probe.LocalEndpoint).Port; probe.Stop();
-        result.app = RelayHost.Build(new(Port: 0, Bind: "127.0.0.1", AdvertiseHost: "127.0.0.1", RangeStart: port, RangeEnd: Math.Min(65535, port + 20)), result.identity);
+        result.app = RelayHost.Build(new(Port: 0, Bind: "127.0.0.1", AdvertiseHost: "127.0.0.1", RangeStart: port, RangeEnd: Math.Min(65535, port + rangeSize)), result.identity);
         await result.app.StartAsync();
         result.Address = result.identity.Address("127.0.0.1", new Uri(result.app.Urls.Single()).Port);
         return result;

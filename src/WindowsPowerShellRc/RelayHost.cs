@@ -33,7 +33,8 @@ public sealed class RelayService(RelayOptions options, ServerIdentity identity, 
     {
         Authenticate(context);
         var lease = registry.Allocate();
-        using var stop = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken, lifetime.ApplicationStopping);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken, lifetime.ApplicationStopping, deadline.Token);
         Task sending = Task.CompletedTask, receiving = Task.CompletedTask;
         try
         {
@@ -45,18 +46,19 @@ public sealed class RelayService(RelayOptions options, ServerIdentity identity, 
             }
             async Task Receive()
             {
-                while (await requests.MoveNext(stop.Token).WaitAsync(TimeSpan.FromSeconds(20), stop.Token))
+                while (await requests.MoveNext(stop.Token))
                 {
                     var frame = requests.Current;
                     if (!frame.Heartbeat || frame.Lease.Length != 0 || frame.Host.Length != 0 || frame.Port != 0 || frame.ConnectionId.Length != 0)
                         throw new RpcException(new Status(StatusCode.InvalidArgument, "Expected relay heartbeat."));
+                    deadline.CancelAfter(TimeSpan.FromSeconds(20));
                     await lease.Messages.Writer.WriteAsync(new() { Heartbeat = true }, stop.Token);
                 }
             }
             sending = Send(); receiving = Receive();
             await await Task.WhenAny(sending, receiving);
         }
-        catch (TimeoutException) { throw new RpcException(new Status(StatusCode.DeadlineExceeded, "Relay registration heartbeat expired.")); }
+        catch (OperationCanceledException) when (deadline.IsCancellationRequested && !context.CancellationToken.IsCancellationRequested) { throw new RpcException(new Status(StatusCode.DeadlineExceeded, "Relay registration heartbeat expired.")); }
         finally
         {
             stop.Cancel();

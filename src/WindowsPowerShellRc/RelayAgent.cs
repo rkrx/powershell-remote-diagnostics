@@ -13,6 +13,7 @@ public static class RelayAgent
         var client = new Relay.RelayClient(channel);
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(token);
         using var registration = client.Register(relay.Headers, cancellationToken: stop.Token);
+        using var capacity = new SemaphoreSlim(8);
         var workers = new Dictionary<string, Task>(); var gate = new object();
         Task sending = Task.CompletedTask, receiving = Task.CompletedTask;
         try
@@ -47,7 +48,7 @@ public static class RelayAgent
                     await call.RequestStream.CompleteAsync();
                 }
                 catch (Exception ex) when (ex is RpcException or OperationCanceledException or IOException or SocketException or ObjectDisposedException) { /* One failed external socket does not kill its RC registration. */ }
-                finally { lock (gate) workers.Remove(id); }
+                finally { lock (gate) workers.Remove(id); capacity.Release(); }
             }
             async Task Receive()
             {
@@ -58,8 +59,12 @@ public static class RelayAgent
                     if (!Guid.TryParseExact(frame.ConnectionId, "D", out _) || frame.Heartbeat || frame.Lease.Length != 0 || frame.Host.Length != 0 || frame.Port != 0)
                         throw new IOException("Relay returned an invalid connection notification.");
                     lock (gate)
+                        if (workers.ContainsKey(frame.ConnectionId)) throw new IOException("Relay repeated an active connection notification.");
+                    // Relay and agent finish their two ends at different times. Wait for
+                    // bounded local capacity instead of treating ordinary cleanup skew as fatal.
+                    if (!await capacity.WaitAsync(TimeSpan.FromSeconds(10), stop.Token)) continue;
+                    lock (gate)
                     {
-                        if (workers.Count >= 8 || workers.ContainsKey(frame.ConnectionId)) throw new IOException("Relay exceeded connection limits.");
                         string id = frame.ConnectionId;
                         workers.Add(id, Task.Run(() => Bridge(id), CancellationToken.None));
                     }

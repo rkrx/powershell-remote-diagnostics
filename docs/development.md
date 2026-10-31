@@ -33,9 +33,9 @@ RID-specific publishing relocates `System.Management.Automation.dll` to the appl
 
 Build outputs and private verification records are not committed. Project source/debug metadata maps checkout paths to `/_/`, including SourceLink metadata. Keep real hostnames, accounts, tokens, declarations and diagnostic output out of Git.
 
-GitHub runs the full suite and extracted Windows ZIP gRPC/MCP tests before upload. A separate macOS job builds and checks MCP startup from the client package. Release assets are attached only after required build jobs succeed. A manual release-tag backfill builds the tagged source, not current main. Actual older-Windows TLS/HTTP2 qualification and macOS signing/notarization remain separate deployment checks.
+GitHub runs the full suite and extracted Windows ZIP gRPC/MCP tests before upload. No macOS CI job or macOS release upload is enabled. Release assets are attached only after required build jobs succeed. A manual release-tag backfill builds the tagged source, not current main. Actual older-Windows TLS/HTTP2 qualification remains a separate deployment check.
 
-## macOS bundle integrity and Gatekeeper
+## Optional local macOS bundle integrity and Gatekeeper
 
 The SDK signs its standalone apphost, but moving that executable into a newly created `.app` changes its signing context. The complete bundle and nested code must be sealed after `Info.plist` and all contents are finalized. The publishing script applies a development ad-hoc signature and verifies it strictly. CI repeats the strict deep verification after extracting the actual archive, catching missing resource seals or signature metadata lost during archiving. Do not replace these checks with `--version` or a direct MCP startup test.
 
@@ -48,3 +48,5 @@ The approved design and implementation plan are under docs/superpowers/. The rel
 All diagnostic calls now require a session stream as well as bearer authentication. Tests must open DiagnosticSession before unary calls; a second session is intentionally rejected. Relay tests exercise actual pinned TLS, byte forwarding, half-close, registration expiry, bounded tunnels, and process-level MCP execution. Timeout cases deliberately add roughly one minute to the suite.
 
 Windows packages use supported .NET single-file publishing without trimming. Physical module assets and documents live under support/. Do not move modules independently or introduce a second launcher. Native libraries use .NET's standard extraction cache; the target user needs a writable cache directory. The private transport Session stream must never be logged or auto-retried with script submissions.
+
+The single-file analyzer package is pinned explicitly (Microsoft.NET.ILLink.Tasks 10.0.14) so SDK patch-version changes do not invalidate locked restores. Keep this tooling dependency updated deliberately with its lock files.

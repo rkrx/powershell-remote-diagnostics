@@ -74,6 +74,32 @@ public class SessionTests
         Assert.Contains("session", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task AcceptedWorkSurvivesSessionReleaseAndIsReadableByReplacement()
+    {
+        using var engine = new FakeEngine { Release = new(TaskCreationOptions.RunContinuationsAsynchronously) };
+        await using var server = await TestGrpcServer.Start(engine);
+        using var channel = server.Address.CreateChannel(); var client = new Diagnostics.DiagnosticsClient(channel);
+        var first = await WindowsPowerShellRc.Transport.DiagnosticSession.OpenAsync(client, server.Address.Headers, default);
+        var request = new ExecuteRequest { Reason = "Retain accepted work across disconnect" }; request.Commands.Add("accepted-once");
+        var pending = await client.ExecuteAsync(request, first.Headers);
+        Assert.False(pending.OutputReady); first.Dispose();
+        WindowsPowerShellRc.Transport.DiagnosticSession? replacement = null;
+        for (int i=0; replacement is null; i++)
+        {
+            try { replacement = await WindowsPowerShellRc.Transport.DiagnosticSession.OpenAsync(client, server.Address.Headers, default); }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.AlreadyExists && i < 100) { await Task.Delay(10); }
+        }
+        using (replacement)
+        {
+            Assert.False(server.Queue.Find(Guid.Parse(pending.Id))!.IsTerminal);
+            engine.Release.SetResult();
+            await server.Queue.Find(Guid.Parse(pending.Id))!.Completion.WaitAsync(TimeSpan.FromSeconds(3));
+            var completed = await client.GetExecutionAsync(new() { Id = pending.Id }, replacement.Headers);
+            Assert.Equal("completed", completed.Status); Assert.Equal(pending.Id, completed.Id); Assert.Equal(1, engine.Calls);
+        }
+    }
+
     private sealed class ManualClock : TimeProvider
     {
         private long ticks;
