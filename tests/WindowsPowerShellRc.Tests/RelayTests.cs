@@ -189,6 +189,13 @@ public class RelayTests
         var address = await allocated.Task.WaitAsync(TimeSpan.FromSeconds(10));
         try
         {
+            var invalid = ConnectionAddress.Parse(address.ToConnectionString().Replace(rc.Identity.Key.Value, new string('0',64)));
+            using (var bad = invalid.CreateChannel())
+                Assert.Equal(StatusCode.Unauthenticated, (await Assert.ThrowsAsync<RpcException>(() => DiagnosticSession.OpenAsync(new(bad), invalid.Headers, default))).StatusCode);
+            string pin = rc.Identity.Certificate.GetCertHashString(System.Security.Cryptography.HashAlgorithmName.SHA256).ToLowerInvariant();
+            var untrusted = ConnectionAddress.Parse(address.ToConnectionString().Replace(pin, new string('0',64)));
+            using (var bad = untrusted.CreateChannel())
+                await Assert.ThrowsAsync<RpcException>(() => DiagnosticSession.OpenAsync(new(bad), address.Headers, default));
             using (var channel = address.CreateChannel())
             {
                 var client = new WindowsPowerShellRc.Protocol.Diagnostics.DiagnosticsClient(channel);

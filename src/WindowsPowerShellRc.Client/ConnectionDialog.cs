@@ -19,7 +19,7 @@ public sealed class ConnectionDialog : IConnectionPrompt
         using var pipe = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.Inheritable);
         var start = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
         if ((Path.GetFileNameWithoutExtension(Environment.ProcessPath) ?? "").Equals("dotnet", StringComparison.OrdinalIgnoreCase))
-            start.ArgumentList.Add(Assembly.GetExecutingAssembly().Location);
+            start.ArgumentList.Add(SourceAssemblyPath());
         start.ArgumentList.Add("--connection-dialog"); start.ArgumentList.Add(pipe.GetClientHandleAsString());
         using var child = Process.Start(start) ?? throw new InvalidOperationException("Could not open the connection dialog. Supply connectionString instead.");
         pipe.DisposeLocalCopyOfClientHandle();
@@ -39,6 +39,8 @@ public sealed class ConnectionDialog : IConnectionPrompt
             if (!child.HasExited) { child.Kill(entireProcessTree: true); await child.WaitForExitAsync(); }
         }
     }
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("SingleFile", "IL3000", Justification = "Only called when Environment.ProcessPath is dotnet, so this is a framework-dependent source build, not a single-file apphost.")]
+    private static string SourceAssemblyPath() => Assembly.GetExecutingAssembly().Location;
     public static int Run(string handle)
     {
         try

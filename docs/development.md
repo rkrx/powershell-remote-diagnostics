@@ -40,3 +40,11 @@ GitHub runs the full suite and extracted Windows ZIP gRPC/MCP tests before uploa
 The SDK signs its standalone apphost, but moving that executable into a newly created `.app` changes its signing context. The complete bundle and nested code must be sealed after `Info.plist` and all contents are finalized. The publishing script applies a development ad-hoc signature and verifies it strictly. CI repeats the strict deep verification after extracting the actual archive, catching missing resource seals or signature metadata lost during archiving. Do not replace these checks with `--version` or a direct MCP startup test.
 
 Ad-hoc integrity signing is separate from trusted distribution. Normal browser-downloaded app execution under default Gatekeeper settings requires an Apple Developer ID identity and notarization. These credentials are not configured in this repository. Do not disable Gatekeeper or strip quarantine as a packaging fix.
+
+## Relay and session development
+
+The approved design and implementation plan are under docs/superpowers/. The relay uses the same server project, with `relay` after the dotnet-run argument separator. See the README for Linux source commands; Linux relay execution is separate from Windows RC qualification and Windows-only binary distribution.
+
+All diagnostic calls now require a session stream as well as bearer authentication. Tests must open DiagnosticSession before unary calls; a second session is intentionally rejected. Relay tests exercise actual pinned TLS, byte forwarding, half-close, registration expiry, bounded tunnels, and process-level MCP execution. Timeout cases deliberately add roughly one minute to the suite.
+
+Windows packages use supported .NET single-file publishing without trimming. Physical module assets and documents live under support/. Do not move modules independently or introduce a second launcher. Native libraries use .NET's standard extraction cache; the target user needs a writable cache directory. The private transport Session stream must never be logged or auto-retried with script submissions.

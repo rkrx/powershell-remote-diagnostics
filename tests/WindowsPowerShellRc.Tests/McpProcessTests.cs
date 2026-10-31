@@ -48,6 +48,18 @@ public class McpProcessTests
             Assert.Equal("completed", result.GetProperty("status").GetString());
             Assert.True(Guid.TryParse(result.GetProperty("id").GetString(), out _));
             Assert.Contains("42", result.GetProperty("output").ToString());
+            using (var otherChannel = server.Address.CreateChannel())
+            {
+                var busy = await Assert.ThrowsAsync<Grpc.Core.RpcException>(() => WindowsPowerShellRc.Transport.DiagnosticSession.OpenAsync(new(otherChannel), server.Address.Headers, default));
+                Assert.Equal(Grpc.Core.StatusCode.AlreadyExists, busy.StatusCode);
+            }
+            string executionId = result.GetProperty("id").GetString()!;
+            var page = await Send(8, "tools/call", new { name = "read_output", arguments = new { connectionId, id = executionId } });
+            Assert.Contains("42", page.ToString());
+            var search = await Send(9, "tools/call", new { name = "search_output", arguments = new { connectionId, id = executionId, q = "42" } });
+            Assert.Contains("42", search.ToString());
+            var cancelled = await Send(10, "tools/call", new { name = "cancel_execution", arguments = new { connectionId, id = executionId } });
+            Assert.Contains("completed", cancelled.ToString());
             var bad = await Send(5, "tools/call", new { name = "connect", arguments = new { connectionString = "grpc://sensitive-input@host:8080" } });
             Assert.True(bad.GetProperty("result").GetProperty("isError").GetBoolean());
             Assert.DoesNotContain("sensitive-input", bad.ToString());
@@ -58,6 +70,18 @@ public class McpProcessTests
             Assert.Contains("do not blindly retry", missing.ToString());
             var unknown = await Send(7, "tools/call", new { name = "server_info", arguments = new { connectionId = Guid.NewGuid().ToString() } });
             Assert.Contains("Unknown connection ID", unknown.ToString());
+            await Send(11, "tools/call", new { name = "disconnect", arguments = new { connectionId } });
+            JsonElement reconnected = default;
+            for (int attempt=0; attempt<100; attempt++)
+            {
+                reconnected = await Send(12 + attempt, "tools/call", new { name = "connect", arguments = new { connectionString = server.Address.ToConnectionString() } });
+                if (!reconnected.GetProperty("result").TryGetProperty("isError", out var error) || !error.GetBoolean()) break;
+                await Task.Delay(10);
+            }
+            var reconnectText = reconnected.GetProperty("result").GetProperty("content")[0].GetProperty("text").GetString()!;
+            Assert.True(JsonDocument.Parse(reconnectText).RootElement.TryGetProperty("connectionId", out _));
+            Assert.Contains(server.ConsoleLines, l => l.Contains("Client connected; session"));
+            Assert.DoesNotContain(server.ConsoleLines, l => l.Contains("Bearer ") || l.Contains(server.Address.ToConnectionString()));
         }
         finally
         {

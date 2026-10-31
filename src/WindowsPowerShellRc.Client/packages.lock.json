@@ -66,6 +66,12 @@
           "Microsoft.Extensions.Options": "10.0.10"
         }
       },
+      "Microsoft.NET.ILLink.Tasks": {
+        "type": "Direct",
+        "requested": "[10.0.10, )",
+        "resolved": "10.0.10",
+        "contentHash": "USPlGK4SzGfR2gy8h4lZ54e9hHBJpPiaPn86f1jEuRmu92/T+DGiexDbPpRBQzNVSJtCW6VR0q2VslLbchrrnA=="
+      },
       "ModelContextProtocol": {
         "type": "Direct",
         "requested": "[2.3.0, )",

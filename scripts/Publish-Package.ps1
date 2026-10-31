@@ -10,21 +10,22 @@ $repo = Split-Path -Parent $PSScriptRoot
 $project = if ($Component -eq 'Server') { 'src/WindowsPowerShellRc' } else { 'src/WindowsPowerShellRc.Client' }
 $output = Join-Path $repo "artifacts/$($Component.ToLowerInvariant())/$Runtime"
 if (Test-Path $output) { Remove-Item $output -Recurse -Force }
-& dotnet publish (Join-Path $repo $project) -c Release -r $Runtime --self-contained true -p:PublishTrimmed=false -p:RestoreLockedMode=true -o $output
+$publishFlags = if ($Runtime.StartsWith('win')) { @('-p:PublishSingleFile=true', '-p:IncludeNativeLibrariesForSelfExtract=true') } else { @() }
+& dotnet publish (Join-Path $repo $project) -c Release -r $Runtime --self-contained true -p:PublishTrimmed=false -p:RestoreLockedMode=true -o $output @publishFlags
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed.' }
 $binary = if ($Component -eq 'Server') { 'powershell-rc' } else { 'WindowsPowerShellRc.Client' }
 $executable = $binary + $(if ($Runtime.StartsWith('win')) { '.exe' } else { '' })
-foreach ($required in @($executable, "$binary.dll", 'WindowsPowerShellRc.Transport.dll')) {
+foreach ($required in $(if ($Runtime.StartsWith('win')) { @($executable) } else { @($executable, "$binary.dll", 'WindowsPowerShellRc.Transport.dll') })) {
     if (-not (Test-Path (Join-Path $output $required))) { throw "Missing packaged dependency: $required" }
 }
 if ($Component -eq 'Server') {
-    foreach ($required in @('coreclr.dll', 'System.Management.Automation.dll', 'Microsoft.PowerShell.Commands.Utility.dll', 'Modules/Microsoft.PowerShell.Utility/Microsoft.PowerShell.Utility.psd1')) {
+    foreach ($required in @('Modules/Microsoft.PowerShell.Utility/Microsoft.PowerShell.Utility.psd1')) {
         if (-not (Test-Path (Join-Path $output $required))) { throw "Missing bundled engine dependency: $required" }
     }
 } elseif (Test-Path (Join-Path $output 'System.Management.Automation.dll')) {
     throw 'The client must not contain the server PowerShell engine.'
 }
-foreach ($file in Get-ChildItem $output -File | Where-Object { $_.Name -like 'WindowsPowerShellRc*.dll' -or $_.Name -like 'WindowsPowerShellRc*.pdb' -or $_.Name -like 'powershell-rc.*' }) {
+foreach ($file in Get-ChildItem $output -File | Where-Object { $_.Name -like 'WindowsPowerShellRc*.dll' -or $_.Name -like 'WindowsPowerShellRc*.pdb' -or $_.Name -like 'powershell-rc.*' -or $_.Name -eq 'WindowsPowerShellRc.Client.exe' }) {
     $bytes = [IO.File]::ReadAllBytes($file.FullName)
     foreach ($encoding in @([Text.Encoding]::UTF8, [Text.Encoding]::Unicode)) {
         $text = $encoding.GetString($bytes)
@@ -36,6 +37,10 @@ Copy-Item (Join-Path $repo 'LICENSE') $output -Force
 Copy-Item (Join-Path $repo 'docs') $output -Recurse -Force
 $name = "WindowsPowerShellRc-$Component-$Runtime"
 if ($Runtime.StartsWith('win')) {
+    # Standard .NET single-file host; external engine assets stay physical below support.
+    $support = Join-Path $output 'support'
+    New-Item -ItemType Directory -Path $support -Force | Out-Null
+    Get-ChildItem $output | Where-Object { $_.Name -ne $executable -and $_.Name -ne 'support' } | Move-Item -Destination $support
     $archive = Join-Path $repo "artifacts/$name.zip"
     Compress-Archive -Path (Join-Path $output '*') -DestinationPath $archive -Force
 } else {

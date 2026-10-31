@@ -13,13 +13,9 @@ Download the appropriate archives from [GitHub Releases](https://github.com/rkrx
 
 New CI builds and releases provide Windows packages only. Older releases may still contain macOS archives; macOS source development remains available.
 
-Extract the entire package. Keep all DLLs, runtime files and, on the server, the `Modules` directory beside the executable. Neither component requires a separate .NET installation.
+Extract the entire package. Each Windows archive has its executable at the root and all accompanying files under `support/`. Keep that directory with the executable. Standard .NET single-file publishing bundles the managed application and extracts native dependencies to its runtime cache on first start; the RC loads its physical PowerShell modules from `support/Modules`. Neither component requires a separate .NET or PowerShell installation.
 
 **The server includes its own PowerShell 7 engine**, embedded through the official `Microsoft.PowerShell.SDK`. No PowerShell installation, WinRM setup or PowerShell fallback is required on the target. The client does not include or require PowerShell.
-
-The macOS archives in v0.2.0 have a bundle-sealing defect; v0.2.1 fixes that defect. Replace the entire older application bundle when upgrading. These development builds remain ad-hoc signed, not Developer ID signed/notarized. Gatekeeper may still block downloaded copies; a valid bundle signature is not approval by Apple. A local source build remains available.
-
-macOS development packages are ad-hoc signed and their complete bundle signatures are verified both before archiving and after extraction. They are **not Developer ID signed or notarized**, so they are not approved for normal downloaded-app execution under default Gatekeeper settings. Use a local source build for development; trusted public distribution requires Developer ID signing and Apple notarization. A successful CLI/MCP test does not prove Gatekeeper acceptance.
 
 ## Start the Windows server
 
@@ -46,6 +42,7 @@ Keep the string secret like a password. It contains a random access secret and t
 | `-d`, `--declaration` | Read a UTF-8 policy file | Read-only diagnostics |
 | `-p`, `--port` | TLS gRPC listening port | 8080 |
 | `-b`, `--bind` | Local IP, exact interface name, or `All` | All interfaces |
+| `--relay URL` | Connect outbound to a relay registration URL; diagnostics bind loopback only | Direct listener |
 | `-h`, `--help` | Show help | |
 | `--version` | Show version | |
 
@@ -68,7 +65,7 @@ Register the client executable in your MCP host. For example:
 }
 ```
 
-On Windows use the full path to `WindowsPowerShellRc.Client.exe`. On macOS point `command` to `WindowsPowerShellRc.Client.app/Contents/MacOS/WindowsPowerShellRc.Client` inside the extracted application bundle. The client communicates over stdin/stdout; it does not open an MCP HTTP port. `--help` and `--version` are standalone CLI commands, not MCP server arguments.
+On Windows use the full path to `WindowsPowerShellRc.Client.exe`. For macOS source development use `dotnet run --project /absolute/path/to/src/WindowsPowerShellRc.Client -c Release --no-build --no-restore` after building Release once. The client communicates over stdin/stdout; it does not open an MCP HTTP port. `--help` and `--version` are standalone CLI commands, not MCP server arguments.
 
 Ask the agent to call `connect` with the complete server connection string as `connectionString`. **A working supplied string connects directly without opening any GUI**, including on a headless client. If the string is omitted, a local Avalonia dialog asks the human to paste it. Closing the dialog cancels connection. An invalid or failed supplied string returns an error without unexpectedly opening a window. The GUI is optional and requires an interactive desktop.
 
@@ -76,7 +73,7 @@ Connection data never appears in GUI process arguments or temporary files; an in
 
 ## MCP tools
 
-`connect` returns a local `connectionId` and the authenticated server instructions, declaration and runtime environment. Read these before executing scripts. Supply `connectionId` to the other tools. Up to 16 local connections may be retained.
+`connect` returns a local `connectionId` and the authenticated server instructions, declaration and runtime environment. Read these before executing scripts. Supply `connectionId` to the other tools. Up to 16 local connections to different RC instances may be retained. **Each RC admits exactly one authenticated client session**, direct or relayed. A second client receives `AlreadyExists`; invalid credentials cannot reserve the slot. Disconnect releases the session; after a crash or network partition the server releases it after 20 seconds without heartbeats. The client sends a heartbeat every five seconds, independently of script execution or approval.
 
 | Tool | Purpose |
 |---|---|
@@ -87,7 +84,7 @@ Connection data never appears in GUI process arguments or temporary files; an in
 | `read_output(connectionId, id, ...)` | Read pages or long-line segments |
 | `search_output(connectionId, id, q, ...)` | Literal search with surrounding context |
 | `cancel_execution(connectionId, id)` | Withdraw queued work or request cooperative cancellation |
-| `disconnect(connectionId)` | Close the local channel without cancelling accepted work |
+| `disconnect(connectionId)` | Release the server session and close the local channel without cancelling accepted work |
 
 `commands` are joined with LF into one script. Use readable multiline code, four-space indentation, descriptive names and introductory comments explaining complex commands. `reason` explains why execution is needed. Each submission receives one server-side approval and one UUID. A persistent PowerShell session preserves variables, functions, modules and working location. Jobs run serially, FIFO.
 
@@ -109,9 +106,11 @@ Protobuf JSON represents 64-bit line coordinates as decimal strings. Optional fi
 
 ## Protocol and migration
 
-Version 0.2 replaces REST entirely. `GET /` and `/executions` are no longer supported. The versioned protobuf contract is [diagnostics.proto](src/WindowsPowerShellRc.Transport/diagnostics.proto); gRPC methods are `GetInfo`, `Execute`, `GetExecution`, `ReadOutput`, `Search` and `Cancel`. All require authentication over pinned TLS. There is no plaintext fallback or certificate-verification bypass.
+Version 0.2 replaces REST entirely. `GET /` and `/executions` are no longer supported. Version 0.3 adds mandatory diagnostic session streams and is incompatible with 0.2 clients: upgrade client and RC together. Old bearer-only requests return a session-required error. The versioned protobuf contract is [diagnostics.proto](src/WindowsPowerShellRc.Transport/diagnostics.proto); gRPC methods include `Session`, `GetInfo`, `Execute`, `GetExecution`, `ReadOutput`, `Search` and `Cancel`. All require authentication over pinned TLS. There is no plaintext fallback or certificate-verification bypass.
 
-Common gRPC errors: `Unauthenticated` for a bad token, `InvalidArgument` for bad input, `NotFound` for unknown/evicted IDs, `FailedPrecondition` for pending output/search, `ResourceExhausted` for full queues/oversized requests and `Internal` for storage failures. MCP errors preserve sanitized status codes and recovery hints without exposing credentials; an interrupted execution may still be running.
+Connection/session logs contain a timestamp, nonsecret session ID and direct/relay mode. They never include access tokens or complete connection URLs. A failed session is not automatically reopened; disconnect the local entry and explicitly connect again. Accepted executions and the persistent runspace survive client disconnects, so a new admitted client can inspect retained UUID results.
+
+Common gRPC errors: `AlreadyExists` for an occupied client slot, `Unauthenticated` for a bad token, `InvalidArgument` for bad input, `NotFound` for unknown/evicted IDs, `FailedPrecondition` for pending output/search, `ResourceExhausted` for full queues/oversized requests and `Internal` for storage failures. MCP errors preserve sanitized status codes and recovery hints without exposing credentials; an interrupted execution may still be running.
 
 ## Build and validation
 
@@ -126,7 +125,35 @@ GitHub Actions builds and tests the Windows server and client packages only. Pub
 
 All project-authored documentation, prompts and declarations are English. Supplied declarations, commands and output retain their own language. Do not commit real connection strings, diagnostic data, hostnames or local environment details.
 
-The Windows RC executable is named `powershell-rc.exe`. Runtime and engine files currently retain the standard self-contained .NET layout. Do not move DLLs or `Modules` independently: embedded PowerShell module discovery relies on the packaged paths. A standard single-file layout is under evaluation; no custom launcher is introduced.
+## Relay a Windows RC behind NAT or a firewall
+
+On a reachable Windows host, start relay mode from the server package:
+
+```powershell
+.\powershell-rc.exe relay --port 8080 --bind All --advertise-host relay.example --port-range-start 20000 --port-range-end 25000
+```
+
+The relay prints a secret `Registration: grpc://...` URL. It starts no PowerShell engine and needs no per-script approval console. Its default range is 20000–25000, inclusive. The advertised host defaults to the machine hostname; specify a hostname/IP that both the RC and client can reach. The control port must be outside the public range. Permit inbound TCP to port 8080 and the configured range; configure NAT/port forwarding where needed. The application does not modify firewalls automatically.
+
+On the remote Windows machine, start the RC using that **registration** URL:
+
+```powershell
+.\powershell-rc.exe --relay 'grpc://<relay-registration-token-and-pin>@relay.example:8080'
+```
+
+The RC opens an internal loopback-only diagnostic listener and connects outbound to the relay. Existing `--auto`, `--test` and `--declaration` options still apply. Relay operation replaces the public direct listener; `--port`/`--bind` do not expose a diagnostic port in this mode.
+
+The RC prints a different **client connection URL**, containing its own token and certificate pin, at the relay's allocated public port:
+
+```text
+grpc://<rc-token-and-certificate-pin>@relay.example:20000
+```
+
+Give this second URL to the diagnostic client's normal `connect` tool. The client needs no special relay configuration. The relay forwards opaque TCP bytes; diagnostic TLS, the RC certificate check and token authentication remain end to end. The relay receives neither the RC private key nor its diagnostic token. The outer RC-to-relay registration/tunnel transport also uses pinned TLS. Registration credentials and client credentials authorize different operations; do not interchange them. CLI arguments can be visible to local OS users/administrators; treat the registration URL accordingly.
+
+A port stays assigned for the entire RC registration. Client disconnects preserve the port and client URL, allowing a different client to connect once the previous session has ended. Stopping the RC releases the port; a missing RC heartbeat releases it after 20 seconds. Old listeners and sockets close before the port can be reused. A registration/control failure ends the RC's relay mode with an error; restart it and use the newly printed connection URL. There is no silent automatic re-registration or script replay. Restarting the relay also ends existing allocations.
+
+Capacity is bounded: at most 100 RC registrations, 8 simultaneous/pending TCP tunnels per RC, 32 KiB data frames and bounded queues. An unclaimed tunnel times out after 10 seconds; a tunnel without payload traffic closes after 20 seconds. Active diagnostic sessions keep their transport alive with five-second heartbeats. No free public port or exhausted capacity produces a clear error. The relay is an additional network dependency; it cannot prevent an authorized relay operator from disrupting availability.
 
 ## Run the relay from source on Linux
 

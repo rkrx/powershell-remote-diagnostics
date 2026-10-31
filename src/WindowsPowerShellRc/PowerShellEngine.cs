@@ -20,6 +20,9 @@ public sealed class PowerShellEngine : IPowerShellEngine
     public string Version { get; }
     public PowerShellEngine()
     {
+        string bundledModules = Path.Combine(AppContext.BaseDirectory, "support", "Modules");
+        if (Directory.Exists(bundledModules))
+            Environment.SetEnvironmentVariable("PSModulePath", bundledModules + Path.PathSeparator + Environment.GetEnvironmentVariable("PSModulePath"));
         runspace = RunspaceFactory.CreateRunspace(new NonInteractiveHost(), InitialSessionState.CreateDefault2());
         try
         {
