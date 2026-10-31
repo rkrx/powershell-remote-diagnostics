@@ -43,7 +43,7 @@ if ($Runtime.StartsWith('win')) {
     New-Item -ItemType Directory -Path $macos -Force | Out-Null
     Get-ChildItem $output | Where-Object { $_.FullName -ne $bundle } | Move-Item -Destination $macos
     $version = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $macos "$binary.dll")).ProductVersion.Split('+')[0]
-    @" 
+    @"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
