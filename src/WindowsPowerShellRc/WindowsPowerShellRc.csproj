@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework><EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
-    <Version>0.3.2</Version>
+    <Version>0.3.3</Version>
     <AssemblyName>powershell-rc</AssemblyName>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <Nullable>enable</Nullable>

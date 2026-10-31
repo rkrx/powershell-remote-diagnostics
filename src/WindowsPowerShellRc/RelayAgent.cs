@@ -48,7 +48,7 @@ public static class RelayAgent
                     await call.RequestStream.CompleteAsync();
                 }
                 catch (Exception ex) when (ex is RpcException or OperationCanceledException or IOException or SocketException or ObjectDisposedException) { /* One failed external socket does not kill its RC registration. */ }
-                finally { lock (gate) workers.Remove(id); capacity.Release(); }
+                finally { lock (gate) { workers.Remove(id); capacity.Release(); } }
             }
             async Task Receive()
             {
@@ -74,11 +74,21 @@ public static class RelayAgent
             sending = Send(); receiving = Receive();
             await await Task.WhenAny(sending, receiving);
         }
+        catch (RpcException ex) when (token.IsCancellationRequested && ex.StatusCode == StatusCode.Cancelled)
+        {
+            // Either streaming direction can win the cancellation race. Expose
+            // one caller-cancellation contract, including during the first write.
+            throw new OperationCanceledException("Relay operation was cancelled by its caller.", ex, token);
+        }
         finally
         {
-            stop.Cancel(); registration.Dispose();
+            stop.Cancel();
+            // Stop notification production before collecting bridge tasks. The
+            // using declaration disposes registration only after its users exit.
+            try { await Task.WhenAll(sending, receiving); }
+            catch (Exception ex) when (ex is RpcException or OperationCanceledException or IOException or TimeoutException) { }
             Task[] bridges; lock (gate) bridges = workers.Values.ToArray();
-            try { await Task.WhenAll(bridges.Append(sending).Append(receiving)); }
+            try { await Task.WhenAll(bridges); }
             catch (Exception ex) when (ex is RpcException or OperationCanceledException or IOException or TimeoutException) { }
         }
     }

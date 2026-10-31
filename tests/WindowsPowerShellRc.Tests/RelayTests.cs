@@ -264,6 +264,22 @@ public class RelayTests
     }
 
     [Fact]
+    public async Task CallerCancellationAlwaysUsesTheSameCancellationContract()
+    {
+        await using var relay = await TestRelay.Start();
+        for (int attempt=0; attempt<60; attempt++)
+        {
+            using var stop = new CancellationTokenSource();
+            var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var agent = RelayAgent.RunAsync(relay.Address, 1, (_, _) => ready.TrySetResult(), stop.Token);
+            await ready.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            if (attempt % 2 == 0) await Task.Delay(1);
+            stop.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => agent);
+        }
+    }
+
+    [Fact]
     public async Task RealTlsDiagnosticsPassThroughRelayAndClientReconnectKeepsTheSamePort()
     {
         await using var rc = await TestGrpcServer.Start();
