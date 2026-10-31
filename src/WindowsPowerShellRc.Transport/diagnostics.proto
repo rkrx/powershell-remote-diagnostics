@@ -2,6 +2,7 @@ syntax = "proto3";
 option csharp_namespace = "WindowsPowerShellRc.Protocol";
 package diagnostics.v1;
 service Diagnostics {
+  rpc Session (stream SessionFrame) returns (stream SessionFrame);
   rpc GetInfo (Empty) returns (ServerInfo);
   rpc Execute (ExecuteRequest) returns (ExecutionReply);
   rpc GetExecution (ExecutionId) returns (ExecutionReply);
@@ -26,3 +27,5 @@ message OutputReply { string id = 1; OutputPage output = 2; }
 message SearchRequest { string id = 1; string q = 2; bool ignore_case = 3; int32 before_lines = 4; int32 after_lines = 5; int32 before_chars = 6; int32 after_chars = 7; optional int32 limit = 8; optional string cursor = 9; }
 message SearchMatch { int64 line = 1; int32 char_offset = 2; int32 match_length = 3; string context = 4; int32 context_offset = 5; bool context_truncated = 6; repeated OutputLine lines = 7; }
 message SearchReply { string id = 1; repeated SearchMatch matches = 2; optional string next_cursor = 3; }
+
+message SessionFrame { string credential = 1; bool heartbeat = 2; }

@@ -12,6 +12,7 @@ internal sealed class ServerProcess : IAsyncDisposable
     private readonly Process process;
     private readonly Task pump;
     private readonly Task<string> errors;
+    private DiagnosticSession? admission;
     private GrpcChannel channel = null!;
     public ConcurrentQueue<string> ConsoleLines { get; } = new();
     public ConnectionAddress Address { get; private set; } = null!;
@@ -53,10 +54,12 @@ internal sealed class ServerProcess : IAsyncDisposable
     public async Task<ExecutionReply> Execute(string script)
     {
         var request = new ExecuteRequest { Reason = "Synthetic package verification" }; request.Commands.Add(script);
-        return await Client.ExecuteAsync(request, Address.Headers, DateTime.UtcNow.AddSeconds(25));
+        admission ??= await DiagnosticSession.OpenAsync(Client, Address.Headers, default);
+        return await Client.ExecuteAsync(request, admission.Headers, DateTime.UtcNow.AddSeconds(25));
     }
     public async ValueTask DisposeAsync()
     {
+        admission?.Dispose();
         channel?.Dispose();
         if (!process.HasExited) process.Kill(entireProcessTree: true);
         await process.WaitForExitAsync(); await pump; await errors; process.Dispose();

@@ -16,7 +16,9 @@ public class StorageFaultTests
         var data = (FileStream)typeof(StoredOutput).GetField("data", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(job.Output)!;
         data.Position = 0; data.WriteByte((byte)'!'); data.Flush();
         using var channel = server.Address.CreateChannel();
-        var status = await new Diagnostics.DiagnosticsClient(channel).GetExecutionAsync(new() { Id = job.Id.ToString() }, server.Address.Headers);
+        var client = new Diagnostics.DiagnosticsClient(channel);
+        using var admission = await WindowsPowerShellRc.Transport.DiagnosticSession.OpenAsync(client, server.Address.Headers, default);
+        var status = await client.GetExecutionAsync(new() { Id = job.Id.ToString() }, admission.Headers);
         Assert.Equal(job.Id.ToString(), status.Id);
         Assert.True(status.OutputIncomplete);
         Assert.True(status.HasError);

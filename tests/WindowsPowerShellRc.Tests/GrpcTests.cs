@@ -26,7 +26,8 @@ public class GrpcTests
             async () => { await client.SearchAsync(new()); },
             async () => { await client.CancelAsync(new()); } })
             Assert.Equal(StatusCode.Unauthenticated, (await Assert.ThrowsAsync<RpcException>(operation)).StatusCode);
-        var info = await client.GetInfoAsync(new Empty(), server.Address.Headers);
+        using var admission = await DiagnosticSession.OpenAsync(client, server.Address.Headers, default);
+        var info = await client.GetInfoAsync(new Empty(), admission.Headers);
         Assert.Contains("CUSTOM POLICY", info.Instructions);
         Assert.Contains(Environment.MachineName, info.Instructions);
         Assert.DoesNotContain(server.Identity.Key.Value, info.Instructions);
@@ -45,7 +46,9 @@ public class GrpcTests
         using var engine = new FakeEngine { Release = new(TaskCreationOptions.RunContinuationsAsynchronously) };
         await using var server = await TestGrpcServer.Start(engine);
         using var channel = server.Address.CreateChannel();
-        var client = new Diagnostics.DiagnosticsClient(channel); var headers = server.Address.Headers;
+        var client = new Diagnostics.DiagnosticsClient(channel);
+        using var admission = await DiagnosticSession.OpenAsync(client, server.Address.Headers, default);
+        var headers = admission.Headers;
         var request = new ExecuteRequest { Reason = "Check persistent script" }; request.Commands.Add(["$x=1", "$x"]);
         var pending = await client.ExecuteAsync(request, headers);
         Assert.False(pending.OutputReady); Assert.True(Guid.TryParse(pending.Id, out var id));
@@ -87,7 +90,8 @@ public class GrpcTests
         var client = new Diagnostics.DiagnosticsClient(channel);
         var request = new ExecuteRequest { Reason = "Verify interrupted request semantics" }; request.Commands.Add("accepted work");
         using var cancel = new CancellationTokenSource();
-        using var call = client.ExecuteAsync(request, server.Address.Headers, cancellationToken: cancel.Token);
+        using var admission = await DiagnosticSession.OpenAsync(client, server.Address.Headers, default);
+        using var call = client.ExecuteAsync(request, admission.Headers, cancellationToken: cancel.Token);
         var job = await approval.Accepted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         for (int i=0; i<100 && engine.Calls == 0; i++) await Task.Delay(5);
         cancel.Cancel();
@@ -96,7 +100,7 @@ public class GrpcTests
         engine.Release.SetResult();
         await job.Completion.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal("completed", job.Status);
-        var final = await client.GetExecutionAsync(new() { Id = job.Id.ToString() }, server.Address.Headers);
+        var final = await client.GetExecutionAsync(new() { Id = job.Id.ToString() }, admission.Headers);
         Assert.Equal("completed", final.Status); Assert.Equal(1, engine.Calls);
     }
     private sealed class CaptureApproval : IApproval

@@ -3,8 +3,9 @@ using P = WindowsPowerShellRc.Protocol;
 
 namespace WindowsPowerShellRc;
 
-public sealed class DiagnosticsService(ServerState state) : P.Diagnostics.DiagnosticsBase
+public sealed class DiagnosticsService(ServerState state, ClientSessions sessions) : P.Diagnostics.DiagnosticsBase
 {
+    public override Task Session(IAsyncStreamReader<P.SessionFrame> requests, IServerStreamWriter<P.SessionFrame> responses, ServerCallContext context) => SessionService.Run(sessions, requests, responses, context);
     public override Task<P.ServerInfo> GetInfo(P.Empty request, ServerCallContext context) => Task.FromResult(new P.ServerInfo
     {
         Instructions = AgentGuide.Render(state.Options, state.Declaration, state.EngineVersion),

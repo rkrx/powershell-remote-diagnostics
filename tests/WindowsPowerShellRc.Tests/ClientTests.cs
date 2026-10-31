@@ -12,6 +12,8 @@ public class ClientTests
         string first = await manager.ConnectAsync(server.Address.ToConnectionString(), default);
         Assert.Equal(0, prompt.Calls);
         Assert.True(Guid.TryParse(JsonDocument.Parse(first).RootElement.GetProperty("connectionId").GetString(), out _));
+        manager.Disconnect(JsonDocument.Parse(first).RootElement.GetProperty("connectionId").GetString()!);
+        await Task.Delay(50);
         await manager.ConnectAsync(null, default);
         Assert.Equal(1, prompt.Calls);
     }
