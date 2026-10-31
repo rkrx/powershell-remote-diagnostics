@@ -9,6 +9,11 @@ if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed.' }
 foreach ($required in @('WindowsPowerShellRc.exe', 'coreclr.dll', 'System.Management.Automation.dll', 'Microsoft.PowerShell.Commands.Utility.dll')) {
     if (-not (Test-Path (Join-Path $output $required))) { throw "Missing packaged dependency: $required" }
 }
+foreach ($module in @('Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Security', 'Microsoft.PowerShell.Host')) {
+    if (-not (Test-Path (Join-Path $output "Modules/$module/$module.psd1"))) {
+        throw "Missing packaged PowerShell module manifest: $module"
+    }
+}
 # Project-owned binaries and symbols must not disclose the build checkout path.
 foreach ($name in @('WindowsPowerShellRc.dll', 'WindowsPowerShellRc.pdb')) {
     $path = Join-Path $output $name

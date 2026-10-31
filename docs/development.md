@@ -24,6 +24,10 @@ Build outputs, test results and local settings are ignored by Git. Source paths 
 
 Build the portable Windows distribution with scripts/Publish-Windows.ps1. The resulting artifacts directory is for local distribution output and is not committed.
 
+RID-specific publishing moves `System.Management.Automation.dll` to the application root. The project stages the SDK's platform-specific built-in module manifests into `Modules` beside that DLL, matching `$PSHOME/Modules`. Without this step, a normal development build can succeed while a published application cannot load `Out-String` on a computer without a separate PowerShell 7 installation.
+
+After packaging, CI extracts the ZIP into a fresh directory and runs the `PackagedHostTests` REST regression against that executable with an isolated inherited `PSModulePath` and a different working directory. The test checks real execution, module resolution from the package, and terminal output mirroring. `--version` alone does not initialize the engine and cannot validate the package.
+
 ## GitHub Actions
 
 The Windows download workflow runs the Release suite on `windows-2022` before using the existing packaging script. Successful runs expose the complete self-contained ZIP as an Actions artifact, retained for 30 days. Publishing a GitHub Release (including a prerelease) builds its tagged revision and attaches the tested ZIP as a release asset, regardless of whether the tag has a `v` prefix. Draft releases do not trigger a build. Version tag pushes matching `v*` also create a release with the package.

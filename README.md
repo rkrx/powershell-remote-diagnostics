@@ -20,6 +20,8 @@ Open an interactive terminal in the extracted directory:
 
 The console displays the listening addresses, environment mode, declaration, embedded engine version, and a randomly generated Bearer token. Keep the terminal open. Press Ctrl+C to stop the server.
 
+Approval questions appear in green, script requests in purple, and approval decisions in cyan. Captured script output (including errors, warnings, and information) is also mirrored to the terminal in its default color. Terminal control characters in requests and mirrored output are escaped; redirected console output contains no added color codes.
+
 The example binds to the local computer. Omitting `--bind` uses the default of all interfaces. The application does not install a service, create firewall rules, or elevate its privileges. Scripts run with the permissions of the account that starts the application.
 
 | Option | Meaning | Default |
@@ -123,7 +125,7 @@ dotnet run --project src/WindowsPowerShellRc --no-launch-profile -- --bind 127.0
 pwsh -File scripts/Publish-Windows.ps1
 ```
 
-The project uses .NET 10 and the official Microsoft.PowerShell.SDK 7.6.8. The packaging script produces a self-contained `win-x64` directory and ZIP under `artifacts/`, without trimming, NativeAOT, or an installer. All project-authored documentation, prompts, and declarations are in English. Custom declarations and diagnostic output retain their supplied language.
+The project uses .NET 10 and the official Microsoft.PowerShell.SDK 7.6.8. The packaging script produces a self-contained `win-x64` directory and ZIP under `artifacts/`, without trimming, NativeAOT, or an installer. The `Modules` directory beside the executable contains the bundled engine's built-in module manifests and must be kept with the application. Startup checks the output formatter before opening the HTTP server. All project-authored documentation, prompts, and declarations are in English. Custom declarations and diagnostic output retain their supplied language.
 
 ### GitHub builds and downloads
 

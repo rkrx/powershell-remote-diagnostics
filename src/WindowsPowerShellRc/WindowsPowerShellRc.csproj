@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -11,5 +11,22 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.6.8" />
   </ItemGroup>
+
+  <!-- RID-specific publishing moves SMA.dll to the application root. Its built-in
+       module manifests must then be under $PSHOME/Modules, alongside that DLL. -->
+  <Target Name="StagePublishedPowerShellModules" AfterTargets="Publish">
+    <PropertyGroup>
+      <PowerShellModulePlatform Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('win'))">win</PowerShellModulePlatform>
+      <PowerShellModulePlatform Condition="'$(PowerShellModulePlatform)' == ''">unix</PowerShellModulePlatform>
+      <PowerShellModuleSource>$(PublishDir)runtimes/$(PowerShellModulePlatform)/lib/$(TargetFramework)/Modules</PowerShellModuleSource>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(PowerShellModuleSource)/Microsoft.PowerShell.Utility/Microsoft.PowerShell.Utility.psd1')"
+           Text="Bundled PowerShell module manifests are missing from the SDK publish output." />
+    <ItemGroup>
+      <PowerShellModuleFile Include="$(PowerShellModuleSource)/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PowerShellModuleFile)"
+          DestinationFiles="@(PowerShellModuleFile->'$(PublishDir)Modules/%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
 
 </Project>

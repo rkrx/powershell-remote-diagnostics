@@ -12,8 +12,9 @@ public sealed class AutoApproval : IApproval
     public Task<bool> ConfirmAsync(Execution execution, CancellationToken cancellationToken) => Task.FromResult(true);
 }
 
-public sealed class ConsoleApproval(bool auto) : IApproval
+public sealed class ConsoleApproval(bool auto, ConsoleTerminal? terminal = null) : IApproval
 {
+    private readonly ConsoleTerminal terminal = terminal ?? new ConsoleTerminal();
     public static string Escape(string text)
     {
         var result = new StringBuilder();
@@ -29,11 +30,11 @@ public sealed class ConsoleApproval(bool auto) : IApproval
 
     public async Task<bool> ConfirmAsync(Execution execution, CancellationToken cancellationToken)
     {
-        Console.WriteLine($"\nRequest {execution.Id}\nReason: {Escape(execution.Request.Reason)}\nScript:\n{Escape(execution.Script)}");
-        if (auto) { Console.WriteLine("Auto mode: approved."); return true; }
+        terminal.Request(execution);
+        if (auto) { terminal.Decision("Auto mode: approved."); return true; }
         while (Console.KeyAvailable) Console.ReadKey(intercept: true);
         var input = new StringBuilder();
-        Console.Write($"Approve {execution.Id}? [y/n] ");
+        terminal.Question($"Approve {execution.Id}? [y/n] ");
         try
         {
             while (true)
@@ -45,14 +46,14 @@ public sealed class ConsoleApproval(bool auto) : IApproval
                 {
                     Console.WriteLine();
                     string answer = input.ToString().Trim(); input.Clear();
-                    if (answer.Equals("y", StringComparison.OrdinalIgnoreCase)) return true;
-                    if (answer.Equals("n", StringComparison.OrdinalIgnoreCase)) return false;
-                    Console.Write($"Approve {execution.Id}? Enter y or n: ");
+                    if (answer.Equals("y", StringComparison.OrdinalIgnoreCase)) { terminal.Decision($"Approved: {execution.Id}"); return true; }
+                    if (answer.Equals("n", StringComparison.OrdinalIgnoreCase)) { terminal.Decision($"Denied: {execution.Id}"); return false; }
+                    terminal.Question($"Approve {execution.Id}? Enter y or n: ");
                 }
                 else if (key.Key == ConsoleKey.Backspace && input.Length > 0) { input.Length--; Console.Write("\b \b"); }
                 else if (!char.IsControl(key.KeyChar) && input.Length < 32) { input.Append(key.KeyChar); Console.Write(key.KeyChar); }
             }
         }
-        catch (OperationCanceledException) { Console.WriteLine($"\nApproval cancelled: {execution.Id}"); throw; }
+        catch (OperationCanceledException) { terminal.Decision($"\nApproval cancelled: {execution.Id}"); throw; }
     }
 }

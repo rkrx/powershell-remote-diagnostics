@@ -50,6 +50,25 @@ jobs:
       - name: Run Release tests on Windows
         run: dotnet test -c Release -m:1 --no-restore --blame-hang-timeout 2m --logger "trx;LogFileName=windows-tests.trx" --results-directory TestResults
 
+      - name: Build self-contained Windows package
+        run: ./scripts/Publish-Windows.ps1
+
+      - name: Check packaged executable
+        run: ./artifacts/win-x64/WindowsPowerShellRc.exe --version
+
+      - name: Exercise REST execution from the extracted Windows ZIP
+        run: |
+          $extracted = Join-Path $env:RUNNER_TEMP ("rc-package-" + [guid]::NewGuid())
+          Expand-Archive ./artifacts/Windows-Powershell-RC-win-x64.zip $extracted
+          $env:RC_TEST_EXECUTABLE = Join-Path $extracted 'WindowsPowerShellRc.exe'
+          try {
+            dotnet test -c Release -m:1 --no-build --no-restore --filter FullyQualifiedName~PackagedHostTests --logger "trx;LogFileName=packaged-tests.trx" --results-directory TestResults
+            if ($LASTEXITCODE -ne 0) { throw 'Extracted Windows package REST verification failed.' }
+          } finally {
+            Remove-Item Env:RC_TEST_EXECUTABLE
+            Remove-Item $extracted -Recurse -Force
+          }
+
       - name: Report failing Windows tests
         if: failure()
         run: |
@@ -61,12 +80,6 @@ jobs:
               Write-Host "::error::$escaped"
             }
           }
-
-      - name: Build self-contained Windows package
-        run: ./scripts/Publish-Windows.ps1
-
-      - name: Check packaged executable
-        run: ./artifacts/win-x64/WindowsPowerShellRc.exe --version
 
       - name: Upload Windows download
         id: download

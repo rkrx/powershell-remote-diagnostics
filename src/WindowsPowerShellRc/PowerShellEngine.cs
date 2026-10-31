@@ -21,10 +21,23 @@ public sealed class PowerShellEngine : IPowerShellEngine
     public PowerShellEngine()
     {
         runspace = RunspaceFactory.CreateRunspace(new NonInteractiveHost(), InitialSessionState.CreateDefault2());
-        runspace.Open();
-        using var query = PowerShell.Create();
-        query.Runspace = runspace;
-        Version = query.AddScript("$PSVersionTable.PSVersion.ToString()").Invoke()[0].ToString();
+        try
+        {
+            runspace.Open();
+            using var query = PowerShell.Create();
+            query.Runspace = runspace;
+            // Exercise the same formatter as real requests before accepting HTTP traffic.
+            var version = query.AddScript("$PSVersionTable.PSVersion.ToString()")
+                .AddCommand("Out-String").Invoke();
+            if (query.HadErrors || version.Count != 1)
+                throw new InvalidOperationException("Embedded PowerShell initialization failed. Extract the complete package, including Modules.");
+            Version = version[0].ToString().Trim();
+        }
+        catch
+        {
+            runspace.Dispose();
+            throw;
+        }
     }
 
     public Task<EngineResult> ExecuteAsync(string script, Action<string, string> emit, CancellationToken cancellationToken) => Task.Run(() =>

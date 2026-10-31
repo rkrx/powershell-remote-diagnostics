@@ -5,6 +5,7 @@ public sealed class ExecutionQueue : IAsyncDisposable
     private readonly IPowerShellEngine engine;
     private readonly IApproval approval;
     private readonly OutputStore store;
+    private readonly Action<string, string>? mirror;
     private readonly object gate = new();
     private readonly LinkedList<Execution> waiting = new();
     private readonly Dictionary<Guid, Execution> executions = new();
@@ -14,9 +15,9 @@ public sealed class ExecutionQueue : IAsyncDisposable
     private bool stopping;
     private Execution? active;
 
-    public ExecutionQueue(IPowerShellEngine engine, IApproval approval, OutputStore store)
+    public ExecutionQueue(IPowerShellEngine engine, IApproval approval, OutputStore store, Action<string, string>? mirror = null)
     {
-        this.engine = engine; this.approval = approval; this.store = store;
+        this.engine = engine; this.approval = approval; this.store = store; this.mirror = mirror;
         worker = Task.Run(WorkAsync);
     }
 
@@ -99,7 +100,11 @@ public sealed class ExecutionQueue : IAsyncDisposable
                         job.Cancellation.Token.ThrowIfCancellationRequested();
                         job.Status = "running";
                     }
-                    var result = await engine.ExecuteAsync(job.Script, job.Output.Append, job.Cancellation.Token);
+                    var result = await engine.ExecuteAsync(job.Script, (stream, text) =>
+                    {
+                        job.Output.Append(stream, text);
+                        mirror?.Invoke(stream, text);
+                    }, job.Cancellation.Token);
                     job.NativeExitCode = result.NativeExitCode; job.OutputIncomplete = result.OutputIncomplete;
                     if (result.OutputIncomplete) job.Error = "Output storage failed; output is incomplete.";
                     finalStatus = result.OutputIncomplete ? "failed" : result.Cancelled ? "cancelled" : result.HadErrors ? "failed" : "completed";
