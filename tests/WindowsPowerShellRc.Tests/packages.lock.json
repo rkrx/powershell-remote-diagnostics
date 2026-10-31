@@ -1352,14 +1352,6 @@
           "xunit.extensibility.core": "[2.9.3]"
         }
       },
-      "windowspowershellrc": {
-        "type": "Project",
-        "dependencies": {
-          "Grpc.AspNetCore": "[2.85.0, )",
-          "Microsoft.PowerShell.SDK": "[7.6.8, )",
-          "WindowsPowerShellRc.Transport": "[1.0.0, )"
-        }
-      },
       "windowspowershellrc.client": {
         "type": "Project",
         "dependencies": {
@@ -1368,6 +1360,14 @@
           "Avalonia.Themes.Fluent": "[12.1.4, )",
           "Microsoft.Extensions.Hosting": "[10.0.10, )",
           "ModelContextProtocol": "[2.3.0, )",
+          "WindowsPowerShellRc.Transport": "[1.0.0, )"
+        }
+      },
+      "WindowsPowerShellRc.Server": {
+        "type": "Project",
+        "dependencies": {
+          "Grpc.AspNetCore": "[2.85.0, )",
+          "Microsoft.PowerShell.SDK": "[7.6.8, )",
           "WindowsPowerShellRc.Transport": "[1.0.0, )"
         }
       },

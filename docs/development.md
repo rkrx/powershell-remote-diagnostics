@@ -1,37 +1,36 @@
 # Development and validation
 
-## Toolchain
-
-Use the .NET 10 SDK and restore the committed package lockfiles. The supported distribution target is win-x64; framework-dependent development builds can run on compatible SDK host platforms.
+Use .NET 10 and the committed package lockfiles:
 
 ```sh
 dotnet restore --locked-mode
-dotnet test -c Release -m:1
-dotnet build -c Release --no-restore -m:1
+dotnet test -c Release -m:1 --no-restore
 ```
 
-Run the server bound to loopback for local testing. Manual mode needs an interactive console. Use --auto only when unattended execution is intentional.
+## Components
 
-## Validation scope
+- `src/WindowsPowerShellRc`: Windows server, embedded PowerShell, approval queue, output store and authenticated gRPC adapter.
+- `src/WindowsPowerShellRc.Transport`: PowerShell-free protobuf contracts, strict connection-string parsing and pinned TLS channel creation.
+- `src/WindowsPowerShellRc.Client`: local MCP stdio host, retained connections and optional Avalonia input subprocess.
 
-The automated suite covers CLI validation, authentication, persistent PowerShell state, streams, FIFO execution, approval/cancellation, HTTP polling, output retention, Unicode pagination, contextual search, storage failures, and native stdin isolation.
+Server startup generates an ephemeral certificate and access key. The versioned opaque connection token contains the key and certificate fingerprint. Pinning replaces CA/hostname trust with the exact copied certificate identity and enforces certificate validity. Do not add a blanket certificate-validation callback, plaintext fallback or automatic execution retry.
 
-Use the Windows acceptance checklist for the actual target OS versions. Record the OS edition/build, patch level, package revision and outcome in a private test record. Do not commit real hostnames, accounts, tokens, diagnostic output, local paths, or deployment declarations.
+MCP stdout must contain only protocol messages. Do not register ordinary console log providers or log tool arguments. GUI entry uses an inherited anonymous pipe; secrets are not process arguments, environment variables or temporary files. A supplied complete URL bypasses the prompt. Failed supplied URLs do not open GUI automatically.
 
-## Build artifacts
+## Tests
 
-Build outputs, test results and local settings are ignored by Git. Source paths in project-owned debug symbols are mapped to a generic /_/ prefix. Continuous-integration path normalization also applies to SourceLink metadata; the packaging script rejects project binaries or symbols containing the checkout path. Do not add generated files or machine-specific configuration to the repository.
+The suite covers TLS pin/auth rejection, token parsing, gRPC queue/polling/errors, direct connection versus prompt behavior, MCP initialize/list/call over real stdio, actual server PowerShell execution, native stdin isolation, approvals/cancellation, retention, Unicode paging/search, storage faults and readable previews.
 
-Build the portable Windows distribution with scripts/Publish-Windows.ps1. The resulting artifacts directory is for local distribution output and is not committed.
+`PackagedHostTests` and `McpProcessTests` can run against actual extracted packages by setting `RC_TEST_SERVER_EXECUTABLE` and `RC_TEST_CLIENT_EXECUTABLE` to the corresponding absolute executable paths. These variables contain no credentials. Subprocess tests start servers bound to loopback with synthetic scripts. The client subprocess must use its own complete output directory; a project-reference copy under the test host can omit dependencies supplied by the test host's shared ASP.NET runtime.
 
-RID-specific publishing moves `System.Management.Automation.dll` to the application root. The project stages the SDK's platform-specific built-in module manifests into `Modules` beside that DLL, matching `$PSHOME/Modules`. Without this step, a normal development build can succeed while a published application cannot load `Out-String` on a computer without a separate PowerShell 7 installation.
+Verify the optional dialog on an interactive desktop: missing URL opens it, Cancel returns a cancelled connection, malformed input stays in the dialog with a generic validation error, and a pasted working URL connects. Direct-URL integration tests must work without a desktop.
 
-After packaging, CI extracts the ZIP into a fresh directory and runs the `PackagedHostTests` REST regression against that executable with an isolated inherited `PSModulePath` and a different working directory. The test checks real execution, module resolution from the package, and terminal output mirroring. `--version` alone does not initialize the engine and cannot validate the package.
+## Publishing
 
-## GitHub Actions
+`Publish-Windows.ps1` builds separate self-contained server/client ZIPs. `Publish-Package.ps1 -Component Client -Runtime osx-arm64` builds the Apple Silicon client archive. The server includes its own PowerShell 7 engine and stages SDK built-in module manifests under `$PSHOME/Modules`; the client must not contain `System.Management.Automation.dll`. Publishing rejects project binaries/symbols containing the checkout path.
 
-The Windows download workflow runs the Release suite on `windows-2022` before using the existing packaging script. Successful runs expose the complete self-contained ZIP as an Actions artifact, retained for 30 days. Publishing a GitHub Release (including a prerelease) builds its tagged revision and attaches the tested ZIP as a release asset, regardless of whether the tag has a `v` prefix. Draft releases do not trigger a build. Version tag pushes matching `v*` also create a release with the package.
+RID-specific publishing relocates `System.Management.Automation.dll` to the application root. Its module manifests must accompany it under `Modules`; otherwise a development build can work while published requests fail at `Out-String`. Startup tests that formatter before accepting gRPC traffic.
 
-A manual run is available from the Actions tab. The optional `release_tag` input checks out exactly `refs/tags/<release_tag>` and publishes the package for that release; an empty input produces only the ordinary build artifact. Select `main` for the workflow definition when backfilling an older release. Release/tag builds use tag-specific concurrency groups and are not cancelled by newer branch builds. Ordinary builds have read-only repository permissions.
+Build outputs and private verification records are not committed. Project source/debug metadata maps checkout paths to `/_/`, including SourceLink metadata. Keep real hostnames, accounts, tokens, declarations and diagnostic output out of Git.
 
-The release job has content write permission and uses the built-in GitHub token. No deployment host, private path, custom secret, or external infrastructure is configured. Windows runner validation does not replace acceptance on every OS edition listed in the platform targets.
+GitHub runs the full suite and extracted Windows ZIP gRPC/MCP tests before upload. A separate macOS job builds and checks MCP startup from the client package. Release assets are attached only after required build jobs succeed. A manual release-tag backfill builds the tagged source, not current main. Actual older-Windows TLS/HTTP2 qualification and macOS signing/notarization remain separate deployment checks.

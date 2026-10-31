@@ -53,7 +53,11 @@ public sealed class ConnectionDialog : IConnectionPrompt
 public sealed class DialogApp : Application
 {
     internal static Stream ResultPipe = Stream.Null;
-    public override void Initialize() => Styles.Add(new FluentTheme());
+    public override void Initialize()
+    {
+        Name = "PowerShell Remote Diagnostics";
+        Styles.Add(new FluentTheme());
+    }
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)

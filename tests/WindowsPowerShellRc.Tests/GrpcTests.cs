@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using System.Net;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using Grpc.Core;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using WindowsPowerShellRc;
@@ -62,6 +64,17 @@ public class GrpcTests
         var next = await client.ExecuteAsync(request, headers);
         Assert.Equal("cancelled", (await client.CancelAsync(new() { Id = next.Id }, headers)).Status is "cancelled" ? "cancelled" : (await WaitForStatus(client, headers, next.Id)).Status);
     }
+    [Fact]
+    public async Task ExpiredCertificateIsRejectedEvenWithTheCorrectPin()
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var request = new CertificateRequest("CN=expired-test", key, HashAlgorithmName.SHA256);
+        using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-2), DateTimeOffset.UtcNow.AddDays(-1));
+        await using var server = await TestGrpcServer.Start(certificate: certificate);
+        using var channel = server.Address.CreateChannel();
+        await Assert.ThrowsAsync<RpcException>(async () => await new Diagnostics.DiagnosticsClient(channel).GetInfoAsync(new(), server.Address.Headers));
+    }
+
     private static async Task<ExecutionReply> WaitForStatus(Diagnostics.DiagnosticsClient c, Metadata h, string id)
     {
         for (int i=0;i<100;i++) { var r = await c.GetExecutionAsync(new() { Id=id },h); if(r.OutputReady) return r; await Task.Delay(10); }
@@ -75,14 +88,14 @@ internal sealed class TestGrpcServer : IAsyncDisposable
     private Microsoft.AspNetCore.Builder.WebApplication app = null!;
     public ExecutionQueue Queue { get; private set; } = null!;
     public ConnectionAddress Address { get; private set; } = null!;
-    public static async Task<TestGrpcServer> Start(IPowerShellEngine? engine = null)
+    public static async Task<TestGrpcServer> Start(IPowerShellEngine? engine = null, X509Certificate2? certificate = null)
     {
         var server = new TestGrpcServer();
         server.Queue = new ExecutionQueue(engine ?? new FakeEngine(), new AutoApproval(), server.store);
         server.app = GrpcApi.Build(new(Auto: true), "CUSTOM POLICY", server.Identity, server.Queue, "7.test", b =>
-            b.WebHost.ConfigureKestrel(k => k.Listen(IPAddress.Loopback, 0, l => { l.Protocols = HttpProtocols.Http2; l.UseHttps(server.Identity.Certificate); })), TimeSpan.FromMilliseconds(30));
+            b.WebHost.ConfigureKestrel(k => k.Listen(IPAddress.Loopback, 0, l => { l.Protocols = HttpProtocols.Http2; l.UseHttps(certificate ?? server.Identity.Certificate); })), TimeSpan.FromMilliseconds(30));
         await server.app.StartAsync();
-        server.Address = server.Identity.Address("127.0.0.1", new Uri(server.app.Urls.Single()).Port);
+        server.Address = new ConnectionAddress("127.0.0.1", new Uri(server.app.Urls.Single()).Port, server.Identity.Key.Value, (certificate ?? server.Identity.Certificate).GetCertHashString(HashAlgorithmName.SHA256).ToLowerInvariant());
         return server;
     }
     public async ValueTask DisposeAsync() { await app.DisposeAsync(); await Queue.DisposeAsync(); store.Dispose(); Identity.Dispose(); }

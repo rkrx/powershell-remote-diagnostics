@@ -1,28 +1,21 @@
-# Windows acceptance — pending
+# Server and client acceptance
 
-Perform on Windows 10 Pro 22H2 x64, Windows 11 x64 and Windows Server 2016/2022/2025 x64; see [platform qualification](platform-support.md). Record OS edition/build, patch level, ESU/LTSC status where relevant, package commit, date and outcome. Ideally use a clean VM with neither a separately installed .NET runtime nor PowerShell 7. Do not install prerequisites to make the test pass without recording that as a failure of the portable package requirement.
+Test the server on Windows 10 Pro 22H2 x64, Windows 11 x64 and Windows Server 2016/2022/2025 x64. Record OS build, patch level and package revision privately. Use a clean machine without separate .NET/PowerShell installations; see platform qualification.
 
-- [ ] Run the complete checklist on Windows 10 Pro 22H2 x64 with the existing self-contained win-x64 package. Record exact OS build/patch level and ESU status; do not infer success from Windows 11 or Server tests.
+- [ ] Extract the entire server ZIP. `WindowsPowerShellRc.Server.exe --help` and `--version` work.
+- [ ] Start on loopback: production/manual/read-only defaults and one secret connection string are shown. No standalone token or plaintext REST endpoint is advertised.
+- [ ] Connect using the separate MCP client and full connection URL, without any GUI opening.
+- [ ] A missing URL opens Avalonia on an interactive client desktop. Cancel cancels connection; malformed input produces a generic validation message. No secret appears in process arguments or stdout logs.
+- [ ] A modified token or fingerprint is rejected; an expired certificate is rejected even with its matching pin. No insecure fallback occurs.
+- [ ] Verify TLS/HTTP2 from Windows and macOS clients, especially against Server 2016 and Windows 10 Pro 22H2.
+- [ ] Read server_info and confirm actual runtime information and declaration.
+- [ ] Submit `'ready'; Get-Date; Get-Item -LiteralPath $PSHOME`; confirm the package's own modules load without installed PS7.
+- [ ] Approval question light purple; approval green; denial/cancellation red; request purple; reason cyan; script yellow; captured output neutral. Verify narrow windows, multiline arrays/pipelines, introductory comments and no source truncation.
+- [ ] Leave approval pending over 15 seconds; execute returns pending with UUID. Poll, approve and obtain final output under the same UUID.
+- [ ] Verify variables/functions/location persist between scripts; concurrent submissions execute FIFO with one approval each.
+- [ ] Verify denial, queued/running cancellation, native exit codes and native processes receiving EOF on stdin.
+- [ ] Retrieve more than 200 output lines, a line longer than 4096 codepoints, Unicode offsets, search context and cursor pages. Verify retention evicts the oldest of 21 completed results.
+- [ ] Disconnect a client while work is running: no duplicate submission or implicit cancellation. Restart server: old URL fails, new URL succeeds, session/results reset.
+- [ ] Verify the Windows and macOS client packages run without PowerShell or a separate .NET installation. Verify MCP stdout contains protocol only.
 
-- [ ] Unzip the complete package; `WindowsPowerShellRc.exe --help` and `--version` work without installation.
-- [ ] Start bound to `127.0.0.1`; startup reports embedded PowerShell 7.6.8, production/manual defaults, declaration and a random token.
-- [ ] With no separate PowerShell 7 installation, execute `'ready'; Get-Date; Get-Item -LiteralPath $PSHOME` through REST. Confirm built-in modules load from the extracted package's `Modules` directory, including when starting from another working directory.
-- [ ] Approval questions are light purple, approvals green, denials/cancellations red, request headers purple, reasons cyan, and scripts yellow. Captured output is mirrored in the default terminal color. Redirected output has no added color codes.
-- [ ] Resize the terminal and submit a long multiline script. The script display fits the window with indentation and marked continuation lines; no source is truncated, and execution uses the original script. Complex scripts have an explanatory introductory comment.
-- [ ] GET / and all execution/output/search/cancel paths reject missing/wrong tokens with 401.
-- [ ] Authenticated GET / reports the actual OS/build, computer name, user/domain, OS/process architectures and .NET runtime, as well as production/test and PowerShell version.
-- [ ] Submit `$rcValue = 42` with a reason. Full script/reason appear; n denies, y executes. A later `$rcValue` returns 42.
-- [ ] Submit two jobs simultaneously. The second waits; each has its own UUID and one approval.
-- [ ] Leave approval pending for over 15 seconds: HTTP returns 202 with UUID. Poll, then approve and obtain final output under the same UUID.
-- [ ] Run `Start-Sleep -Seconds 17; 'done'`: POST returns after approximately 15 seconds, polling later returns the result.
-- [ ] Cancel during approval, then type y: the cancelled script never executes and the next request has its own prompt.
-- [ ] Cancel an executing sleep; a later script still uses the same session. No new session is silently created.
-- [ ] `Write-Error`, `Write-Warning`, `Write-Host` and normal output retain stream labels; nonterminating error yields failed while following output remains accessible.
-- [ ] `Read-Host`/credential/choice prompts fail clearly. A benign native program captures stdout/stderr and sees EOF on stdin without consuming approval input. Native cancellation is checked separately.
-- [ ] Generate a line with over 4096 Unicode codepoints and reconstruct it fully via character ranges; search with line and character context and cursor pagination.
-- [ ] Complete 21 jobs; the oldest becomes 404 while the latest 20 remain readable.
-- [ ] Custom declaration and --test appear on GET /; --test does not enable auto or grant rights.
-- [ ] Bind All accepts IPv4 and IPv6 where available; explicit address/interface and invalid-interface errors work.
-- [ ] Ctrl+C stops acceptance, attempts pipeline cancellation and cleans up this process's temporary files. No firewall/service installation occurs.
-
-Hard termination can leave process-specific temporary files. Cooperative cancellation cannot guarantee immediate termination of every native program and never rolls back changes. Do not treat successful macOS tests or a ZIP build as completion of this checklist.
+Interactive server applications, credential/UAC prompts and rollback of executed scripts are not provided. Forced termination can leave temporary output files. Automated CI on Server 2022 and local macOS checks do not complete acceptance on other target OS versions. macOS client archives are not Developer ID signed/notarized.

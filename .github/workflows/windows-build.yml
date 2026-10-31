@@ -1,5 +1,4 @@
-name: Build Windows download
-
+name: Build server and client downloads
 on:
   push:
     branches: [main]
@@ -11,126 +10,148 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Existing release tag to build and attach a Windows download (leave empty for a build only)'
+        description: 'Existing release tag to build and attach downloads (empty for build only)'
         required: false
         type: string
-
 permissions:
   contents: read
-
 concurrency:
-  group: windows-build-${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
+  group: diagnostics-build-${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
   cancel-in-progress: ${{ github.event_name != 'release' && !inputs.release_tag && !startsWith(github.ref, 'refs/tags/') }}
-
 jobs:
-  build:
-    name: Test and package Windows x64
+  windows:
+    name: Test and package Windows server and client
     runs-on: windows-2022
     timeout-minutes: 25
     defaults:
       run:
         shell: pwsh
     steps:
-      - name: Check out source
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
           persist-credentials: false
-
-      - name: Set up .NET 10
-        uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
           cache: true
           cache-dependency-path: '**/packages.lock.json'
-
       - name: Restore locked dependencies
         run: dotnet restore --locked-mode
-
-      - name: Run Release tests on Windows
+      - name: Run Windows suite
         run: dotnet test -c Release -m:1 --no-restore --blame-hang-timeout 2m --logger "trx;LogFileName=windows-tests.trx" --results-directory TestResults
-
-      - name: Build self-contained Windows package
+      - name: Build separate self-contained packages
         run: ./scripts/Publish-Windows.ps1
-
-      - name: Check packaged executable
-        run: ./artifacts/win-x64/WindowsPowerShellRc.exe --version
-
-      - name: Exercise REST execution from the extracted Windows ZIP
+      - name: Test extracted Windows downloads over TLS and MCP
         run: |
-          $extracted = Join-Path $env:RUNNER_TEMP ("rc-package-" + [guid]::NewGuid())
-          Expand-Archive ./artifacts/Windows-Powershell-RC-win-x64.zip $extracted
-          $env:RC_TEST_EXECUTABLE = Join-Path $extracted 'WindowsPowerShellRc.exe'
+          $root = Join-Path $env:RUNNER_TEMP ("rc-packages-" + [guid]::NewGuid())
+          $server = Join-Path $root 'server'
+          $client = Join-Path $root 'client'
+          Expand-Archive ./artifacts/WindowsPowerShellRc-Server-win-x64.zip $server
+          Expand-Archive ./artifacts/WindowsPowerShellRc-Client-win-x64.zip $client
+          $env:RC_TEST_SERVER_EXECUTABLE = Join-Path $server 'WindowsPowerShellRc.Server.exe'
+          $env:RC_TEST_CLIENT_EXECUTABLE = Join-Path $client 'WindowsPowerShellRc.Client.exe'
           try {
-            dotnet test -c Release -m:1 --no-build --no-restore --filter FullyQualifiedName~PackagedHostTests --logger "trx;LogFileName=packaged-tests.trx" --results-directory TestResults
-            if ($LASTEXITCODE -ne 0) { throw 'Extracted Windows package REST verification failed.' }
+            & $env:RC_TEST_SERVER_EXECUTABLE --version
+            & $env:RC_TEST_CLIENT_EXECUTABLE --version
+            dotnet test -c Release -m:1 --no-build --no-restore --filter 'FullyQualifiedName~PackagedHostTests|FullyQualifiedName~McpProcessTests' --logger "trx;LogFileName=packaged-tests.trx" --results-directory TestResults
+            if ($LASTEXITCODE -ne 0) { throw 'Extracted server/client verification failed.' }
           } finally {
-            Remove-Item Env:RC_TEST_EXECUTABLE
-            Remove-Item $extracted -Recurse -Force
+            Remove-Item Env:RC_TEST_SERVER_EXECUTABLE, Env:RC_TEST_CLIENT_EXECUTABLE
+            Remove-Item $root -Recurse -Force
           }
-
-      - name: Report failing Windows tests
+      - name: Report test failures
         if: failure()
         run: |
           Get-ChildItem TestResults -Filter *.trx -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
             [xml]$results = Get-Content $_.FullName -Raw
             foreach ($test in $results.SelectNodes("//*[local-name()='UnitTestResult' and @outcome='Failed']")) {
               $details = "$($test.testName): $($test.Output.ErrorInfo.Message) $($test.Output.ErrorInfo.StackTrace)"
-              $escaped = $details.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
-              Write-Host "::error::$escaped"
+              Write-Host ("::error::" + $details.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A'))
             }
           }
-
-      - name: Upload Windows download
-        id: download
-        uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7
         with:
-          path: artifacts/Windows-Powershell-RC-win-x64.zip
+          name: WindowsPowerShellRc-Server-win-x64.zip
+          path: artifacts/WindowsPowerShellRc-Server-win-x64.zip
           archive: false
           if-no-files-found: error
           retention-days: 30
-
-      - name: Add download instructions
-        env:
-          DOWNLOAD_URL: ${{ steps.download.outputs.artifact-url }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: WindowsPowerShellRc-Client-win-x64.zip
+          path: artifacts/WindowsPowerShellRc-Client-win-x64.zip
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+  macos:
+    name: Package and test macOS arm64 client
+    runs-on: macos-15
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore --locked-mode
+      - run: dotnet test -c Release -m:1 --no-restore --blame-hang-timeout 2m
+      - name: Build self-contained macOS client
+        run: ./scripts/Publish-Package.ps1 -Component Client -Runtime osx-arm64
+      - name: Test extracted macOS client MCP connection
         run: |
-          @"
-          ## Windows x64 download
-          [Download Windows-Powershell-RC-win-x64.zip]($env:DOWNLOAD_URL)
-
-          Extract the complete ZIP and run WindowsPowerShellRc.exe.
-          The package includes PowerShell 7 and .NET; no separate installation is required.
-          "@ >> $env:GITHUB_STEP_SUMMARY
-
+          $root = Join-Path $env:RUNNER_TEMP ("rc-client-" + [guid]::NewGuid())
+          New-Item -ItemType Directory $root | Out-Null
+          tar -xzf ./artifacts/WindowsPowerShellRc-Client-osx-arm64.tar.gz -C $root
+          $env:RC_TEST_CLIENT_EXECUTABLE = Join-Path $root 'WindowsPowerShellRc.Client.app/Contents/MacOS/WindowsPowerShellRc.Client'
+          try {
+            & $env:RC_TEST_CLIENT_EXECUTABLE --version
+            dotnet test -c Release -m:1 --no-build --no-restore --filter FullyQualifiedName~McpProcessTests
+            if ($LASTEXITCODE -ne 0) { throw 'Extracted macOS client verification failed.' }
+          } finally {
+            Remove-Item Env:RC_TEST_CLIENT_EXECUTABLE
+            Remove-Item $root -Recurse -Force
+          }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: WindowsPowerShellRc-Client-osx-arm64.tar.gz
+          path: artifacts/WindowsPowerShellRc-Client-osx-arm64.tar.gz
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
   release:
-    name: Publish versioned release download
+    name: Publish separate server and client downloads
     if: >-
       github.event_name == 'release' ||
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
       (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
-    needs: build
+    needs: [windows, macos]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
     steps:
-      - name: Download tested Windows package
-        uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v8
         with:
-          name: Windows-Powershell-RC-win-x64.zip
+          pattern: WindowsPowerShellRc-*
           path: release
+          merge-multiple: true
           skip-decompress: true
-
-      - name: Publish GitHub Release
+      - name: Attach all downloads to the release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag || github.ref_name }}
         run: |
-          package="release/Windows-Powershell-RC-win-x64.zip"
+          packages=(release/WindowsPowerShellRc-Server-win-x64.zip release/WindowsPowerShellRc-Client-win-x64.zip release/WindowsPowerShellRc-Client-osx-arm64.tar.gz)
+          for package in "${packages[@]}"; do test -s "$package"; done
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "$package" --clobber
+            gh release upload "$RELEASE_TAG" "${packages[@]}" --clobber
           else
-            gh release create "$RELEASE_TAG" "$package" \
-              --verify-tag --generate-notes --title "$RELEASE_TAG"
+            gh release create "$RELEASE_TAG" "${packages[@]}" --verify-tag --generate-notes --title "$RELEASE_TAG"
           fi

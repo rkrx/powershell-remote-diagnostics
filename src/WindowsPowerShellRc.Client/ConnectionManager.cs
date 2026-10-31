@@ -16,6 +16,7 @@ public sealed class RemoteSession(ConnectionAddress address, GrpcChannel channel
 }
 public sealed class ConnectionManager(IConnectionPrompt prompt) : IDisposable
 {
+    private static readonly JsonFormatter Formatter = new(new JsonFormatter.Settings(true));
     private readonly ConcurrentDictionary<string, RemoteSession> sessions = new();
     private readonly SemaphoreSlim connecting = new(1);
     public async Task<string> ConnectAsync(string? connectionString, CancellationToken token)
@@ -34,7 +35,7 @@ public sealed class ConnectionManager(IConnectionPrompt prompt) : IDisposable
                 var info = await session.Client.GetInfoAsync(new(), session.Headers, DateTime.UtcNow.AddSeconds(10), token);
                 string id = Guid.NewGuid().ToString(); sessions[id] = session;
                 return JsonSerializer.Serialize(new { connectionId = id, host = address.Host, port = address.Port,
-                    serverInfo = JsonDocument.Parse(JsonFormatter.Default.Format(info)).RootElement });
+                    serverInfo = JsonDocument.Parse(Formatter.Format(info)).RootElement });
             }
             catch (RpcException ex)
             {
@@ -48,7 +49,7 @@ public sealed class ConnectionManager(IConnectionPrompt prompt) : IDisposable
     public async Task<string> InvokeAsync<T>(string connectionId, Func<RemoteSession, Task<T>> operation) where T : IMessage
     {
         if (!sessions.TryGetValue(connectionId, out var session)) throw new ArgumentException("Unknown connection ID. Connect first.");
-        try { return JsonFormatter.Default.Format(await operation(session)); }
+        try { return Formatter.Format(await operation(session)); }
         catch (RpcException ex)
         {
             throw new InvalidOperationException($"Remote request failed ({ex.StatusCode}). An interrupted execution may still be running; do not blindly retry submission.");

@@ -26,7 +26,7 @@ public sealed class PowerShellEngine : IPowerShellEngine
             runspace.Open();
             using var query = PowerShell.Create();
             query.Runspace = runspace;
-            // Exercise the same formatter as real requests before accepting HTTP traffic.
+            // Exercise the same formatter as real requests before accepting gRPC traffic.
             var version = query.AddScript("$PSVersionTable.PSVersion.ToString()")
                 .AddCommand("Out-String").Invoke();
             if (query.HadErrors || version.Count != 1)
