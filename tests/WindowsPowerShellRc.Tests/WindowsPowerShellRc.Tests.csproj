@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\WindowsPowerShellRc\WindowsPowerShellRc.csproj" />
+    <ProjectReference Include="../../src/WindowsPowerShellRc.Client/WindowsPowerShellRc.Client.csproj" />
   </ItemGroup>
 
 </Project>

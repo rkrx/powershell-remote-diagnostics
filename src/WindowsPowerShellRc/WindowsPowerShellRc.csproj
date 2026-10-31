@@ -2,7 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Version>0.1.2</Version>
+    <Version>0.2.0</Version>
+    <AssemblyName>WindowsPowerShellRc.Server</AssemblyName>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -10,6 +11,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.6.8" />
+    <PackageReference Include="Grpc.AspNetCore" Version="2.85.0" />
+    <ProjectReference Include="../WindowsPowerShellRc.Transport/WindowsPowerShellRc.Transport.csproj" />
   </ItemGroup>
 
   <!-- RID-specific publishing moves SMA.dll to the application root. Its built-in

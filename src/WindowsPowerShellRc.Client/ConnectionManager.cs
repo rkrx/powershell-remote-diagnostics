@@ -1,0 +1,63 @@
+using System.Collections.Concurrent;
+using System.Text.Json;
+using Google.Protobuf;
+using Grpc.Core;
+using Grpc.Net.Client;
+using WindowsPowerShellRc.Protocol;
+using WindowsPowerShellRc.Transport;
+
+namespace WindowsPowerShellRc.Client;
+public interface IConnectionPrompt { Task<string?> RequestAsync(CancellationToken cancellationToken); }
+public sealed class RemoteSession(ConnectionAddress address, GrpcChannel channel) : IDisposable
+{
+    public Diagnostics.DiagnosticsClient Client { get; } = new(channel);
+    public Metadata Headers => address.Headers;
+    public void Dispose() => channel.Dispose();
+}
+public sealed class ConnectionManager(IConnectionPrompt prompt) : IDisposable
+{
+    private readonly ConcurrentDictionary<string, RemoteSession> sessions = new();
+    private readonly SemaphoreSlim connecting = new(1);
+    public async Task<string> ConnectAsync(string? connectionString, CancellationToken token)
+    {
+        await connecting.WaitAsync(token);
+        try
+        {
+            if (sessions.Count >= 16) throw new InvalidOperationException("Connection limit reached. Disconnect an unused connection first.");
+            if (string.IsNullOrWhiteSpace(connectionString))
+                connectionString = await prompt.RequestAsync(token) ?? throw new OperationCanceledException("Connection entry was cancelled.");
+            var address = ConnectionAddress.Parse(connectionString);
+            var channel = address.CreateChannel();
+            var session = new RemoteSession(address, channel);
+            try
+            {
+                var info = await session.Client.GetInfoAsync(new(), session.Headers, DateTime.UtcNow.AddSeconds(10), token);
+                string id = Guid.NewGuid().ToString(); sessions[id] = session;
+                return JsonSerializer.Serialize(new { connectionId = id, host = address.Host, port = address.Port,
+                    serverInfo = JsonDocument.Parse(JsonFormatter.Default.Format(info)).RootElement });
+            }
+            catch (RpcException ex)
+            {
+                session.Dispose();
+                throw new InvalidOperationException($"Connection failed ({ex.StatusCode}). Check the address, server token and certificate fingerprint; no connection was retained.");
+            }
+            catch { session.Dispose(); throw; }
+        }
+        finally { connecting.Release(); }
+    }
+    public async Task<string> InvokeAsync<T>(string connectionId, Func<RemoteSession, Task<T>> operation) where T : IMessage
+    {
+        if (!sessions.TryGetValue(connectionId, out var session)) throw new ArgumentException("Unknown connection ID. Connect first.");
+        try { return JsonFormatter.Default.Format(await operation(session)); }
+        catch (RpcException ex)
+        {
+            throw new InvalidOperationException($"Remote request failed ({ex.StatusCode}). An interrupted execution may still be running; do not blindly retry submission.");
+        }
+    }
+    public string Disconnect(string connectionId)
+    {
+        if (!sessions.TryRemove(connectionId, out var session)) throw new ArgumentException("Unknown connection ID.");
+        session.Dispose(); return "Disconnected. Accepted remote executions were not cancelled.";
+    }
+    public void Dispose() { foreach (var s in sessions.Values) s.Dispose(); sessions.Clear(); connecting.Dispose(); }
+}

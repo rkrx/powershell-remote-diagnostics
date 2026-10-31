@@ -46,11 +46,11 @@ public sealed record CliOptions(bool Auto = false, bool Test = false, string? De
 
     public const string Usage = """
         Windows-Powershell-RC — embedded PowerShell 7 remote diagnostics
-        Usage: WindowsPowerShellRc [-a] [-t] [-d file] [-p port] [-b IP|interface|All]
+        Usage: WindowsPowerShellRc.Server [-a] [-t] [-d file] [-p port] [-b IP|interface|All]
           -a, --auto          Skip per-script console approval (default: approval required)
           -t, --test          Declare a test environment (default: production)
           -d, --declaration   UTF-8 policy file (default: read-only diagnostics)
-          -p, --port          HTTP port (default: 8080)
+          -p, --port          TLS gRPC port (default: 8080)
           -b, --bind          Local IP or exact interface name (default: All, IPv4/IPv6)
           -h, --help          Show this help without starting the server
               --version       Show version without starting the server

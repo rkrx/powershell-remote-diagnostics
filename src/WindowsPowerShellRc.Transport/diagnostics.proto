@@ -1,0 +1,28 @@
+syntax = "proto3";
+option csharp_namespace = "WindowsPowerShellRc.Protocol";
+package diagnostics.v1;
+service Diagnostics {
+  rpc GetInfo (Empty) returns (ServerInfo);
+  rpc Execute (ExecuteRequest) returns (ExecutionReply);
+  rpc GetExecution (ExecutionId) returns (ExecutionReply);
+  rpc ReadOutput (OutputRequest) returns (OutputReply);
+  rpc Search (SearchRequest) returns (SearchReply);
+  rpc Cancel (ExecutionId) returns (ExecutionReply);
+}
+message Empty {}
+message ServerInfo { string instructions = 1; string engine_version = 2; string session_id = 3; }
+message ExecuteRequest { repeated string commands = 1; string reason = 2; }
+message ExecutionId { string id = 1; }
+message ExecutionReply {
+  string id = 1; string status = 2; bool output_ready = 3; string message = 4;
+  string created_at = 5; optional string finished_at = 6; optional int32 native_exit_code = 7;
+  bool output_incomplete = 8; optional string error = 9; optional string cleanup_warning = 10;
+  OutputPage output = 11;
+}
+message OutputRequest { string id = 1; optional int64 start_line = 2; optional int32 line_count = 3; optional int64 line = 4; optional int32 char_offset = 5; optional int32 char_count = 6; }
+message OutputLine { int64 number = 1; string stream = 2; string text = 3; int32 total_characters = 4; bool is_long_line = 5; bool truncated = 6; int32 char_offset = 7; }
+message OutputPage { repeated OutputLine lines = 1; int64 total_lines = 2; optional int64 next_line = 3; optional int32 next_char_offset = 4; }
+message OutputReply { string id = 1; OutputPage output = 2; }
+message SearchRequest { string id = 1; string q = 2; bool ignore_case = 3; int32 before_lines = 4; int32 after_lines = 5; int32 before_chars = 6; int32 after_chars = 7; optional int32 limit = 8; optional string cursor = 9; }
+message SearchMatch { int64 line = 1; int32 char_offset = 2; int32 match_length = 3; string context = 4; int32 context_offset = 5; bool context_truncated = 6; repeated OutputLine lines = 7; }
+message SearchReply { string id = 1; repeated SearchMatch matches = 2; optional string next_cursor = 3; }

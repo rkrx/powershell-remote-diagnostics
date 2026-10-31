@@ -1,8 +1,6 @@
 using System.Reflection;
 using System.Text;
-using System.Net.Http.Json;
-using System.Text.Json;
-using Microsoft.AspNetCore.TestHost;
+using WindowsPowerShellRc.Protocol;
 using WindowsPowerShellRc;
 
 namespace WindowsPowerShellRc.Tests;
@@ -12,22 +10,17 @@ public class StorageFaultTests
     [Fact]
     public async Task StatusRemainsReadableWhenStoredOutputIsDamaged()
     {
-        using var store = new OutputStore(); using var engine = new FakeEngine();
-        await using var queue = new ExecutionQueue(engine, new AutoApproval(), store);
-        var job = queue.TrySubmit(new(["committed"], "test"))!;
+        await using var server = await TestGrpcServer.Start();
+        var job = server.Queue.TrySubmit(new(["committed"], "test"))!;
         await job.Completion;
         var data = (FileStream)typeof(StoredOutput).GetField("data", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(job.Output)!;
         data.Position = 0; data.WriteByte((byte)'!'); data.Flush();
-        var key = new BearerKey();
-        await using var app = Api.Build(new(Auto: true), "test", key, queue, engine.Version, b => b.WebHost.UseTestServer());
-        await app.StartAsync();
-        using var client = app.GetTestClient(); client.DefaultRequestHeaders.Authorization = new("Bearer", key.Value);
-        var response = await client.GetAsync($"/executions/{job.Id}");
-        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
-        var status = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal(job.Id, status.GetProperty("id").GetGuid());
-        Assert.True(status.GetProperty("outputIncomplete").GetBoolean());
-        Assert.NotEqual(JsonValueKind.Null, status.GetProperty("error").ValueKind);
+        using var channel = server.Address.CreateChannel();
+        var status = await new Diagnostics.DiagnosticsClient(channel).GetExecutionAsync(new() { Id = job.Id.ToString() }, server.Address.Headers);
+        Assert.Equal(job.Id.ToString(), status.Id);
+        Assert.True(status.OutputIncomplete);
+        Assert.True(status.HasError);
+
     }
 
     [Fact]
