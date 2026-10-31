@@ -253,6 +253,17 @@ public class RelayTests
     }
 
     [Fact]
+    public async Task RegistrationCapacityIsBoundedAndReleasedSlotsCanBeAllocatedAgain()
+    {
+        await using var registry = new RelayRegistry(new(Bind: "127.0.0.1", RangeStart: 20000, RangeEnd: 25000));
+        var leases = Enumerable.Range(0,100).Select(_ => registry.Allocate()).ToArray();
+        Assert.Equal(100, leases.Select(l => l.Port).Distinct().Count());
+        Assert.Equal(StatusCode.ResourceExhausted, Assert.Throws<RpcException>(() => registry.Allocate()).StatusCode);
+        await registry.ReleaseAsync(leases[0]);
+        registry.Allocate();
+    }
+
+    [Fact]
     public async Task RealTlsDiagnosticsPassThroughRelayAndClientReconnectKeepsTheSamePort()
     {
         await using var rc = await TestGrpcServer.Start();

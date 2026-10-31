@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using Grpc.Core;
 using WindowsPowerShellRc.Client;
 using WindowsPowerShellRc.Protocol;
@@ -97,6 +98,44 @@ public class SessionTests
             await server.Queue.Find(Guid.Parse(pending.Id))!.Completion.WaitAsync(TimeSpan.FromSeconds(3));
             var completed = await client.GetExecutionAsync(new() { Id = pending.Id }, replacement.Headers);
             Assert.Equal("completed", completed.Status); Assert.Equal(pending.Id, completed.Id); Assert.Equal(1, engine.Calls);
+        }
+    }
+
+    [Fact]
+    public async Task CancelledGetInfoSetupReleasesAdmissionWithoutRetainingAConnection()
+    {
+        var delayed = new DelayedInfo();
+        await using var server = await TestGrpcServer.Start(configure: b =>
+        {
+            b.Services.AddSingleton(delayed);
+            b.Services.AddGrpc(o => o.Interceptors.Add<DelayedInfo>());
+        });
+        using var manager = new ConnectionManager(new NoPrompt());
+        using var cancel = new CancellationTokenSource();
+        var connecting = manager.ConnectAsync(server.Address.ToConnectionString(), cancel.Token);
+        await delayed.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cancel.Cancel();
+        await Assert.ThrowsAsync<ClientOperationException>(() => connecting);
+        delayed.Delay = false;
+        for (int i=0; ; i++)
+        {
+            try { await manager.ConnectAsync(server.Address.ToConnectionString(), default); break; }
+            catch (ClientOperationException ex) when (ex.Message.Contains("AlreadyExists") && i < 100) { await Task.Delay(10); }
+        }
+    }
+
+    private sealed class DelayedInfo : Grpc.Core.Interceptors.Interceptor
+    {
+        public bool Delay = true;
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public override async Task<TResponse> UnaryServerHandler<TRequest,TResponse>(TRequest request, ServerCallContext context, UnaryServerMethod<TRequest,TResponse> continuation)
+        {
+            if (Delay && context.Method.EndsWith("/GetInfo"))
+            {
+                Entered.TrySetResult();
+                await Task.Delay(Timeout.Infinite, context.CancellationToken);
+            }
+            return await continuation(request, context);
         }
     }
 
