@@ -19,7 +19,7 @@ internal sealed class ServerProcess : IAsyncDisposable
     public Diagnostics.DiagnosticsClient Client { get; private set; } = null!;
     public string PackageDirectory { get; }
     private readonly TaskCompletionSource<string> addressReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private ServerProcess(int port)
+    private ServerProcess(int port, string? relay)
     {
         string? executable = Environment.GetEnvironmentVariable("RC_TEST_SERVER_EXECUTABLE");
         string assembly = typeof(WindowsPowerShellRc.PowerShellEngine).Assembly.Location;
@@ -28,6 +28,7 @@ internal sealed class ServerProcess : IAsyncDisposable
         start.Environment["PSModulePath"] = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         if (executable is null) start.ArgumentList.Add(assembly);
         foreach (string arg in new[] { "--auto", "--test", "--bind", "127.0.0.1", "--port", port.ToString() }) start.ArgumentList.Add(arg);
+        if (relay is not null) { start.ArgumentList.Add("--relay"); start.ArgumentList.Add(relay); }
         process = Process.Start(start)!; errors = process.StandardError.ReadToEndAsync();
         pump = Task.Run(async () =>
         {
@@ -39,11 +40,11 @@ internal sealed class ServerProcess : IAsyncDisposable
             addressReady.TrySetException(new InvalidOperationException("Server exited before reporting a connection string."));
         });
     }
-    public static async Task<ServerProcess> Start()
+    public static async Task<ServerProcess> Start(string? relay = null)
     {
         using var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start();
         int port = ((IPEndPoint)listener.LocalEndpoint).Port; listener.Stop();
-        var result = new ServerProcess(port);
+        var result = new ServerProcess(port, relay);
         try
         {
             result.Address = ConnectionAddress.Parse(await result.addressReady.Task.WaitAsync(TimeSpan.FromSeconds(30)));

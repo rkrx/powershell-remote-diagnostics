@@ -29,3 +29,17 @@ message SearchMatch { int64 line = 1; int32 char_offset = 2; int32 match_length 
 message SearchReply { string id = 1; repeated SearchMatch matches = 2; optional string next_cursor = 3; }
 
 message SessionFrame { string credential = 1; bool heartbeat = 2; }
+
+// Outer relay transport forwards inner diagnostic TLS without terminating it.
+service Relay {
+  rpc Register (stream RelayControl) returns (stream RelayControl);
+  rpc Tunnel (stream TunnelFrame) returns (stream TunnelFrame);
+}
+message RelayControl {
+  string lease = 1;
+  string host = 2;
+  int32 port = 3;
+  string connection_id = 4;
+  bool heartbeat = 5;
+}
+message TunnelFrame { string connection_id = 1; bytes data = 2; bool eof = 3; }

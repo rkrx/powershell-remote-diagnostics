@@ -4,10 +4,13 @@ using WindowsPowerShellRc.Client;
 namespace WindowsPowerShellRc.Tests;
 public class McpProcessTests
 {
-    [Fact]
-    public async Task StdioClientConnectsWithoutGuiAndExecutesThroughPinnedGrpc()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task StdioClientConnectsWithoutGuiAndExecutesThroughPinnedGrpc(bool throughRelay)
     {
-        await using var server = await ServerProcess.Start();
+        await using var relay = throughRelay ? await RelayProcess.Start() : null;
+        await using var server = await ServerProcess.Start(relay?.Address.ToConnectionString());
         string? executable = Environment.GetEnvironmentVariable("RC_TEST_CLIENT_EXECUTABLE");
         var start = new ProcessStartInfo(executable ?? "dotnet") { RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = Path.GetTempPath() };
         if (executable is null)

@@ -13,7 +13,7 @@ public static class GrpcApi
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = [] });
         builder.Logging.ClearProviders();
         builder.Services.AddSingleton(new ServerState(options, declaration, engineVersion, identity, queue, wait ?? TimeSpan.FromSeconds(15)));
-        builder.Services.AddSingleton(new ClientSessions(log: Console.WriteLine, mode: "direct"));
+        builder.Services.AddSingleton(new ClientSessions(log: Console.WriteLine, mode: options.Relay is null ? "direct" : "relay"));
         builder.Services.AddGrpc(o => { o.MaxReceiveMessageSize = 1024 * 1024; o.MaxSendMessageSize = 4 * 1024 * 1024; o.Interceptors.Add<AccessInterceptor>(); });
         if (configure is not null) configure(builder);
         else builder.WebHost.ConfigureKestrel(k =>

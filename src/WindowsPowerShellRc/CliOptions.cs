@@ -5,7 +5,7 @@ using System.Text;
 namespace WindowsPowerShellRc;
 
 public sealed record CliOptions(bool Auto = false, bool Test = false, string? DeclarationFile = null,
-    int Port = 8080, string Bind = "All", bool Help = false, bool Version = false)
+    int Port = 8080, string Bind = "All", bool Help = false, bool Version = false, string? Relay = null)
 {
     public const string DefaultDeclaration = "Only read-only diagnostic operations are allowed. Do not change files, data, configuration, services or permissions. Do not install software or restart the system.";
     public static CliOptions Parse(string[] args)
@@ -23,8 +23,14 @@ public sealed record CliOptions(bool Auto = false, bool Test = false, string? De
                 "-b" or "--bind" => options with { Bind = Value() },
                 "-h" or "--help" => options with { Help = true },
                 "--version" => options with { Version = true },
+                "--relay" => options with { Relay = Value() },
                 _ => throw new ArgumentException($"Unknown option: {args[i]}")
             };
+        }
+        if (options.Relay is not null)
+        {
+            try { _ = WindowsPowerShellRc.Transport.ConnectionAddress.Parse(options.Relay); }
+            catch (FormatException) { throw new ArgumentException("Invalid relay registration URL."); }
         }
         return options;
     }
@@ -52,6 +58,7 @@ public sealed record CliOptions(bool Auto = false, bool Test = false, string? De
           -d, --declaration   UTF-8 policy file (default: read-only diagnostics)
           -p, --port          TLS gRPC port (default: 8080)
           -b, --bind          Local IP or exact interface name (default: All, IPv4/IPv6)
+              --relay URL    Connect outbound to a pinned relay; diagnostics bind loopback only
           -h, --help          Show this help without starting the server
               --version       Show version without starting the server
         Includes its own PowerShell 7 engine; self-contained packages also include .NET.

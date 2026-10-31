@@ -127,3 +127,24 @@ GitHub Actions builds and tests the Windows server and client packages only. Pub
 All project-authored documentation, prompts and declarations are English. Supplied declarations, commands and output retain their own language. Do not commit real connection strings, diagnostic data, hostnames or local environment details.
 
 The Windows RC executable is named `powershell-rc.exe`. Runtime and engine files currently retain the standard self-contained .NET layout. Do not move DLLs or `Modules` independently: embedded PowerShell module discovery relies on the packaged paths. A standard single-file layout is under evaluation; no custom launcher is introduced.
+
+## Run the relay from source on Linux
+
+The relay can run from source on a Linux host with the .NET 10 SDK. It forwards encrypted TCP traffic and does not initialize the Windows PowerShell engine. This does not add a Linux RC execution target or a Linux release download.
+
+From the repository root, restore and build once:
+
+```bash
+dotnet restore --locked-mode
+dotnet build src/WindowsPowerShellRc -c Release --no-restore
+```
+
+Then start the already-built relay:
+
+```bash
+dotnet run --project src/WindowsPowerShellRc -c Release --no-build --no-restore -- \
+  relay --port 8080 --bind All --advertise-host relay.example \
+  --port-range-start 20000 --port-range-end 25000
+```
+
+Replace `relay.example` with a hostname or IP reachable by the RC and the diagnostic client. Permit inbound TCP to the control port and the configured public range. The relay prints a secret registration URL; use that URL when starting the Windows RC with `--relay`. Rebuild after changing source; `--no-build` intentionally uses the existing Release build.
