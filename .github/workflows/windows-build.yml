@@ -1,7 +1,7 @@
 name: Build server and client downloads
 on:
   push:
-    branches: [main]
+    branches: [main, 'codex/**']
     tags: ['v*']
   pull_request:
     branches: [main]
