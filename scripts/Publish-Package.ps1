@@ -12,7 +12,7 @@ $output = Join-Path $repo "artifacts/$($Component.ToLowerInvariant())/$Runtime"
 if (Test-Path $output) { Remove-Item $output -Recurse -Force }
 & dotnet publish (Join-Path $repo $project) -c Release -r $Runtime --self-contained true -p:PublishTrimmed=false -p:RestoreLockedMode=true -o $output
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed.' }
-$binary = if ($Component -eq 'Server') { 'WindowsPowerShellRc.Server' } else { 'WindowsPowerShellRc.Client' }
+$binary = if ($Component -eq 'Server') { 'powershell-rc' } else { 'WindowsPowerShellRc.Client' }
 $executable = $binary + $(if ($Runtime.StartsWith('win')) { '.exe' } else { '' })
 foreach ($required in @($executable, "$binary.dll", 'WindowsPowerShellRc.Transport.dll')) {
     if (-not (Test-Path (Join-Path $output $required))) { throw "Missing packaged dependency: $required" }
@@ -24,7 +24,7 @@ if ($Component -eq 'Server') {
 } elseif (Test-Path (Join-Path $output 'System.Management.Automation.dll')) {
     throw 'The client must not contain the server PowerShell engine.'
 }
-foreach ($file in Get-ChildItem $output -File | Where-Object { $_.Name -like 'WindowsPowerShellRc*.dll' -or $_.Name -like 'WindowsPowerShellRc*.pdb' }) {
+foreach ($file in Get-ChildItem $output -File | Where-Object { $_.Name -like 'WindowsPowerShellRc*.dll' -or $_.Name -like 'WindowsPowerShellRc*.pdb' -or $_.Name -like 'powershell-rc.*' }) {
     $bytes = [IO.File]::ReadAllBytes($file.FullName)
     foreach ($encoding in @([Text.Encoding]::UTF8, [Text.Encoding]::Unicode)) {
         $text = $encoding.GetString($bytes)

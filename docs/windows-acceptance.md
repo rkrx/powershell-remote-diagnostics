@@ -2,7 +2,7 @@
 
 Test the server on Windows 10 Pro 22H2 x64, Windows 11 x64 and Windows Server 2016/2022/2025 x64. Record OS build, patch level and package revision privately. Use a clean machine without separate .NET/PowerShell installations; see platform qualification.
 
-- [ ] Extract the entire server ZIP. `WindowsPowerShellRc.Server.exe --help` and `--version` work.
+- [ ] Extract the entire server ZIP. `powershell-rc.exe --help` and `--version` work.
 - [ ] Start on loopback: production/manual/read-only defaults and one secret connection string are shown. No standalone token or plaintext REST endpoint is advertised.
 - [ ] Connect using the separate MCP client and full connection URL, without any GUI opening.
 - [ ] A missing URL opens Avalonia on an interactive client desktop. Cancel cancels connection; malformed input produces a generic validation message. No secret appears in process arguments or stdout logs.

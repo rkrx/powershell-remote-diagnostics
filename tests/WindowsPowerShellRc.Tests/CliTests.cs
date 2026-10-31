@@ -5,6 +5,9 @@ namespace WindowsPowerShellRc.Tests;
 public class CliTests
 {
     [Fact]
+    public void HelpShowsTheWindowsExecutableEntryPoint() => Assert.Contains("powershell-rc", CliOptions.Usage);
+
+    [Fact]
     public void DefaultsAreManualProductionAndAllInterfaces()
     {
         var options = CliOptions.Parse([]);

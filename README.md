@@ -26,7 +26,7 @@ macOS development packages are ad-hoc signed and their complete bundle signature
 Open an interactive terminal:
 
 ```powershell
-.\WindowsPowerShellRc.Server.exe --port 8080 --bind All
+.\powershell-rc.exe --port 8080 --bind All
 ```
 
 Defaults are production mode, manual approval for each script, a read-only diagnostic declaration, port 8080 and all interfaces. The server displays its declaration and a secret connection string:
@@ -125,3 +125,5 @@ Use .NET 10, locked dependency restores and the [development instructions](docs/
 GitHub Actions builds and tests the Windows server and client packages only. Publishing a release or pushing a `v*` tag attaches separate server/client downloads. A manual workflow run accepts `release_tag` to rebuild an existing version; an empty value creates build artifacts only. No personal token or custom deployment secret is required.
 
 All project-authored documentation, prompts and declarations are English. Supplied declarations, commands and output retain their own language. Do not commit real connection strings, diagnostic data, hostnames or local environment details.
+
+The Windows RC executable is named `powershell-rc.exe`. Runtime and engine files currently retain the standard self-contained .NET layout. Do not move DLLs or `Modules` independently: embedded PowerShell module discovery relies on the packaged paths. A standard single-file layout is under evaluation; no custom launcher is introduced.

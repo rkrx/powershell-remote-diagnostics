@@ -49,7 +49,7 @@ jobs:
           $client = Join-Path $root 'client'
           Expand-Archive ./artifacts/WindowsPowerShellRc-Server-win-x64.zip $server
           Expand-Archive ./artifacts/WindowsPowerShellRc-Client-win-x64.zip $client
-          $env:RC_TEST_SERVER_EXECUTABLE = Join-Path $server 'WindowsPowerShellRc.Server.exe'
+          $env:RC_TEST_SERVER_EXECUTABLE = Join-Path $server 'powershell-rc.exe'
           $env:RC_TEST_CLIENT_EXECUTABLE = Join-Path $client 'WindowsPowerShellRc.Client.exe'
           try {
             & $env:RC_TEST_SERVER_EXECUTABLE --version

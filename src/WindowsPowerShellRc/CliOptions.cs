@@ -46,7 +46,7 @@ public sealed record CliOptions(bool Auto = false, bool Test = false, string? De
 
     public const string Usage = """
         Windows-Powershell-RC — embedded PowerShell 7 remote diagnostics
-        Usage: WindowsPowerShellRc.Server [-a] [-t] [-d file] [-p port] [-b IP|interface|All]
+        Usage: powershell-rc [-a] [-t] [-d file] [-p port] [-b IP|interface|All]
           -a, --auto          Skip per-script console approval (default: approval required)
           -t, --test          Declare a test environment (default: production)
           -d, --declaration   UTF-8 policy file (default: read-only diagnostics)
