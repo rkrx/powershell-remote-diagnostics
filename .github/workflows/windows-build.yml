@@ -116,6 +116,8 @@ jobs:
           $root = Join-Path $env:RUNNER_TEMP ("rc-client-" + [guid]::NewGuid())
           New-Item -ItemType Directory $root | Out-Null
           tar -xzf ./artifacts/WindowsPowerShellRc-Client-${{ matrix.rid }}.tar.gz -C $root
+          codesign --verify --deep --strict (Join-Path $root 'WindowsPowerShellRc.Client.app')
+          if ($LASTEXITCODE -ne 0) { throw 'Extracted macOS bundle signature is invalid.' }
           $env:RC_TEST_CLIENT_EXECUTABLE = Join-Path $root 'WindowsPowerShellRc.Client.app/Contents/MacOS/WindowsPowerShellRc.Client'
           try {
             & $env:RC_TEST_CLIENT_EXECUTABLE --version

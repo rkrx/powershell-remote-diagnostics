@@ -34,3 +34,9 @@ RID-specific publishing relocates `System.Management.Automation.dll` to the appl
 Build outputs and private verification records are not committed. Project source/debug metadata maps checkout paths to `/_/`, including SourceLink metadata. Keep real hostnames, accounts, tokens, declarations and diagnostic output out of Git.
 
 GitHub runs the full suite and extracted Windows ZIP gRPC/MCP tests before upload. A separate macOS job builds and checks MCP startup from the client package. Release assets are attached only after required build jobs succeed. A manual release-tag backfill builds the tagged source, not current main. Actual older-Windows TLS/HTTP2 qualification and macOS signing/notarization remain separate deployment checks.
+
+## macOS bundle integrity and Gatekeeper
+
+The SDK signs its standalone apphost, but moving that executable into a newly created `.app` changes its signing context. The complete bundle and nested code must be sealed after `Info.plist` and all contents are finalized. The publishing script applies a development ad-hoc signature and verifies it strictly. CI repeats the strict deep verification after extracting the actual archive, catching missing resource seals or signature metadata lost during archiving. Do not replace these checks with `--version` or a direct MCP startup test.
+
+Ad-hoc integrity signing is separate from trusted distribution. Normal browser-downloaded app execution under default Gatekeeper settings requires an Apple Developer ID identity and notarization. These credentials are not configured in this repository. Do not disable Gatekeeper or strip quarantine as a packaging fix.

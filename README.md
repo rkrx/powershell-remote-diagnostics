@@ -17,7 +17,7 @@ Extract the entire package. Keep all DLLs, runtime files and, on the server, the
 
 **The server includes its own PowerShell 7 engine**, embedded through the official `Microsoft.PowerShell.SDK`. No PowerShell installation, WinRM setup or PowerShell fallback is required on the target. The client does not include or require PowerShell.
 
-The macOS client is not Developer ID signed or notarized. Production distribution policies and target-machine acceptance should account for this; CI builds are not notarization.
+macOS development packages are ad-hoc signed and their complete bundle signatures are verified both before archiving and after extraction. They are **not Developer ID signed or notarized**, so they are not approved for normal downloaded-app execution under default Gatekeeper settings. Use a local source build for development; trusted public distribution requires Developer ID signing and Apple notarization. A successful CLI/MCP test does not prove Gatekeeper acceptance.
 
 ## Start the Windows server
 

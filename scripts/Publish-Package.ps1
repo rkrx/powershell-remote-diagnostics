@@ -5,6 +5,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 if ($Component -eq 'Server' -and $Runtime -ne 'win-x64') { throw 'The server distribution targets Windows x64.' }
+if ($Runtime.StartsWith('osx') -and -not $IsMacOS) { throw 'macOS bundles must be assembled and signature-verified on macOS.' }
 $repo = Split-Path -Parent $PSScriptRoot
 $project = if ($Component -eq 'Server') { 'src/WindowsPowerShellRc' } else { 'src/WindowsPowerShellRc.Client' }
 $output = Join-Path $repo "artifacts/$($Component.ToLowerInvariant())/$Runtime"
@@ -56,6 +57,13 @@ if ($Runtime.StartsWith('win')) {
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 "@ | Set-Content (Join-Path $bundle 'Contents/Info.plist') -Encoding utf8NoBOM
+    # dotnet signs a standalone apphost. After moving it into an application
+    # bundle, seal the complete bundle and nested code before archiving it.
+    # Ad-hoc signing verifies integrity; it is not Developer ID/notarization.
+    & codesign --force --deep --sign - --timestamp=none $bundle
+    if ($LASTEXITCODE -ne 0) { throw 'macOS bundle signing failed.' }
+    & codesign --verify --deep --strict $bundle
+    if ($LASTEXITCODE -ne 0) { throw 'macOS bundle signature verification failed.' }
     $archive = Join-Path $repo "artifacts/$name.tar.gz"
     & tar -czf $archive -C $output .
     if ($LASTEXITCODE -ne 0) { throw 'Client archive creation failed.' }
