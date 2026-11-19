@@ -8,6 +8,9 @@ public sealed record CliOptions(bool Auto = false, bool Test = false, string? De
     int Port = 8080, string Bind = "All", bool Help = false, bool Version = false, string? Relay = null)
 {
     public const string DefaultDeclaration = "Only read-only diagnostic operations are allowed. Do not change files, data, configuration, services or permissions. Do not install software or restart the system.";
+    private const string YoloDeclaration = "Writing changes and running commands and programs are allowed when needed for the operator's task.";
+    public bool Yolo { get; init; }
+
     public static CliOptions Parse(string[] args)
     {
         var options = new CliOptions();
@@ -18,6 +21,7 @@ public sealed record CliOptions(bool Auto = false, bool Test = false, string? De
             {
                 "-a" or "--auto" => options with { Auto = true },
                 "-t" or "--test" => options with { Test = true },
+                "--yolo" => options with { Yolo = true },
                 "-d" or "--declaration" => options with { DeclarationFile = Value() },
                 "-p" or "--port" => options with { Port = int.TryParse(Value(), out int port) && port is > 0 and <= 65535 ? port : throw new ArgumentException("Port must be 1–65535.") },
                 "-b" or "--bind" => options with { Bind = Value() },
@@ -47,8 +51,9 @@ public sealed record CliOptions(bool Auto = false, bool Test = false, string? De
         return addresses;
     }
 
-    public string ReadDeclaration() => DeclarationFile is null ? DefaultDeclaration :
-        File.ReadAllText(DeclarationFile, new UTF8Encoding(false, true));
+    public string ReadDeclaration() => DeclarationFile is not null
+        ? File.ReadAllText(DeclarationFile, new UTF8Encoding(false, true))
+        : (Yolo ? YoloDeclaration : DefaultDeclaration);
 
     public const string Usage = """
         Windows-Powershell-RC — embedded PowerShell 7 remote diagnostics
